@@ -5,6 +5,7 @@
 #include <QToolBar>
 #include <QStatusBar>
 #include <QLabel>
+#include <QTabBar>
 #include <QTabWidget>
 #include <QAction>
 #include <QFileDialog>
@@ -223,6 +224,7 @@ void MainWindow::createCentralTabs()
     // then Log, Breakpoints, Memory Map, etc.
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->setTabPosition(QTabWidget::North);
+    m_tabWidget->tabBar()->setExpanding(false);
 
     m_cpuWidget       = new CPUWidget(m_debugCore, this);
     m_logView         = new LogView(this);
@@ -291,8 +293,9 @@ void MainWindow::connectSignals()
             m_cpuWidget->getDump(), &CPUDump::refresh);
     connect(m_debugCore, &DebugCore::breakpointsChanged,
             m_breakpointsView, &BreakpointsView::refresh);
-    connect(m_debugCore, &DebugCore::breakpointsChanged,
-            m_cpuWidget->getDisassembly(), &CPUDisassembly::refresh);
+    // Disassembly already refreshes via registersChanged (which fires
+    // alongside breakpointsChanged in emitAllRefresh), so no separate
+    // connection needed here — avoids redundant re-disassembly.
     connect(m_debugCore, &DebugCore::threadListChanged,
             m_threadsView, &ThreadsView::refresh);
     connect(m_debugCore, &DebugCore::modulesChanged,
@@ -365,6 +368,7 @@ void MainWindow::applyTheme()
         "QStatusBar { background-color: %6; color: %9; border-top: 1px solid %8; font-size: 12px; padding: 2px 8px; }"
 
         "QTabWidget::pane { border: none; background-color: %1; }"
+        "QTabWidget::tab-bar { left: 0; }"
         "QTabBar { background-color: %6; }"
         "QTabBar::tab { background-color: transparent; color: %9; padding: 8px 16px; border: none;"
         "  border-bottom: 2px solid transparent; font-size: 13px; font-weight: 500; }"

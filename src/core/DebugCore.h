@@ -185,6 +185,7 @@ private slots:
 private:
     void setState(ProcessState state);
     void emitAllRefresh();
+    void emitStepRefresh();   // lightweight refresh for step completion
     void startEventListener();
     void stopEventListener();
 

@@ -200,7 +200,7 @@ CPUDump::CPUDump(DebugCore* debugCore, QWidget* parent)
 
     m_tabBar->setStyleSheet(QString(
         "QTabBar { background: %1; }"
-        "QTabBar::tab { background: %1; color: %5; padding: 4px 12px;"
+        "QTabBar::tab { background: %1; color: %5; padding: 4px 16px; min-width: 50px;"
         "  border: none; border-bottom: 2px solid transparent; font-size: 12px; }"
         "QTabBar::tab:selected { color: %4; border-bottom: 2px solid %6; background: %2; }"
         "QTabBar::tab:hover:!selected { color: %4; }"

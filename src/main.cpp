@@ -12,8 +12,12 @@ static void findLLDBServer()
     if (qEnvironmentVariableIsSet("LLDB_DEBUGSERVER_PATH"))
         return;
 
-    // Common paths for lldb-server on Linux and macOS
+    // Common paths for lldb-server on Linux.
+    // On macOS, DebugCore sets LLDB_DEBUGSERVER_PATH to Apple's signed
+    // debugserver; Homebrew's lldb-server lacks entitlements and will
+    // cause a handshake timeout.
     static const char* paths[] = {
+#ifndef __APPLE__
         "/usr/lib/llvm-18/bin/lldb-server",
         "/usr/lib/llvm-17/bin/lldb-server",
         "/usr/lib/llvm-16/bin/lldb-server",
@@ -22,6 +26,7 @@ static void findLLDBServer()
         "/usr/local/opt/llvm/bin/lldb-server",
         "/opt/homebrew/opt/llvm/bin/lldb-server",
         "/usr/bin/lldb-server",
+#endif
         nullptr
     };
 

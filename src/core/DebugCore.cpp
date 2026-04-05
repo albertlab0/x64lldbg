@@ -1108,10 +1108,9 @@ uint64_t DebugCore::findSymbolAddress(const QString& name)
 void DebugCore::onProcessStopped()
 {
     setState(Stopped);
-    emitAllRefresh();
 
 #ifdef HAS_LLDB
-    // Log stop reason
+    // Log stop reason and choose refresh strategy
     if (m_process.IsValid()) {
         lldb::SBThread thread = m_process.GetSelectedThread();
         if (thread.IsValid()) {
@@ -1140,12 +1139,21 @@ void DebugCore::onProcessStopped()
             emit outputReceived(QString("Stopped at 0x%1 (%2)")
                 .arg(pc, 0, 16).arg(reasonStr));
 
-            if (reason == lldb::eStopReasonBreakpoint) {
-                emit breakpointHit(pc);
+            if (reason == lldb::eStopReasonPlanComplete) {
+                // Step completed — only registers and memory change
+                emitStepRefresh();
+            } else {
+                emitAllRefresh();
+                if (reason == lldb::eStopReasonBreakpoint) {
+                    emit breakpointHit(pc);
+                }
             }
+            return;
         }
     }
 #endif
+    // Fallback if we can't determine the reason
+    emitAllRefresh();
 }
 
 void DebugCore::onProcessRunning()
@@ -1183,6 +1191,14 @@ void DebugCore::emitAllRefresh()
     emit breakpointsChanged();
     emit threadListChanged();
     emit modulesChanged();
+}
+
+void DebugCore::emitStepRefresh()
+{
+    // Only refresh registers + memory (stack/dump).
+    // Breakpoints, threads, and modules don't change on a step.
+    emit registersChanged();
+    emit memoryChanged();
 }
 
 void DebugCore::startEventListener()
