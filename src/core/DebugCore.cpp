@@ -1,5 +1,6 @@
 #include "DebugCore.h"
 #include <QTimer>
+#include <QFile>
 
 // ============================================================
 // LLDBEventListener — background thread polling LLDB events
@@ -996,7 +997,7 @@ QString DebugCore::getStringAt(uint64_t address, int maxLen)
             }
         }
         if (wcharLen >= 4) {
-            return QString::fromUtf16(wbuf, wcharLen);
+            return QString::fromUtf16(reinterpret_cast<const char16_t*>(wbuf), wcharLen);
         }
     }
 #else
