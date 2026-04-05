@@ -15,55 +15,46 @@ option(ENABLE_LLDB "Enable LLDB debugger backend" ON)
 if(ENABLE_LLDB)
     set(HAS_LLDB FALSE)
 
+    # Find LLDB headers (from system LLVM packages or Homebrew)
+    find_path(LLDB_INCLUDE_DIR lldb/API/SBDebugger.h
+        PATHS
+            /usr/lib/llvm-18/include
+            /usr/lib/llvm-17/include
+            /usr/lib/llvm-16/include
+            /usr/lib/llvm-15/include
+            /usr/lib/llvm-14/include
+            /usr/local/opt/llvm/include
+            /opt/homebrew/opt/llvm/include
+    )
+
     if(APPLE)
-        # On macOS, prefer Xcode's LLDB.framework — its debugserver is properly
-        # code-signed. Homebrew's liblldb ships an unsigned debugserver that
-        # fails with "handshake packet timeout".
-        set(_XCODE_LLDB_PATHS
-            /Applications/Xcode.app/Contents/SharedFrameworks
-            /Library/Developer/CommandLineTools/Library/PrivateFrameworks
+        # On macOS, use the system LLDB.framework for linking — its debugserver
+        # is properly code-signed. Homebrew's liblldb ships an unsigned
+        # debugserver that fails with "handshake packet timeout".
+        # Headers still come from Homebrew since the system framework has none.
+        find_library(LLDB_FRAMEWORK LLDB
+            PATHS
+                /Applications/Xcode.app/Contents/SharedFrameworks
+                /Library/Developer/CommandLineTools/Library/PrivateFrameworks
+            NO_DEFAULT_PATH
         )
-        find_library(LLDB_FRAMEWORK LLDB PATHS ${_XCODE_LLDB_PATHS} NO_DEFAULT_PATH)
-        if(LLDB_FRAMEWORK)
-            message(STATUS "LLDB framework found: ${LLDB_FRAMEWORK}")
+        if(LLDB_FRAMEWORK AND LLDB_INCLUDE_DIR)
+            message(STATUS "LLDB framework (link): ${LLDB_FRAMEWORK}")
+            message(STATUS "LLDB headers (Homebrew): ${LLDB_INCLUDE_DIR}")
             set(LLDB_LIBRARY ${LLDB_FRAMEWORK})
             set(HAS_LLDB TRUE)
-            set(LLDB_IS_FRAMEWORK TRUE)
-
-            # Determine header layout: the framework may have headers directly
-            # in Headers/ or nested under Headers/lldb/API/
-            if(EXISTS "${LLDB_FRAMEWORK}/Headers/lldb/API/LLDB.h")
-                # Nested layout — include path is Headers/
-                set(LLDB_INCLUDE_DIR "${LLDB_FRAMEWORK}/Headers")
-            elseif(EXISTS "${LLDB_FRAMEWORK}/Headers/LLDB.h")
-                # Flat layout — headers like LLDB.h, SBDebugger.h in Headers/
-                # Our code includes <lldb/API/LLDB.h>, so create a compatibility
-                # include directory with the expected structure
-                set(_LLDB_COMPAT_DIR "${CMAKE_BINARY_DIR}/lldb-compat-headers/lldb/API")
-                file(MAKE_DIRECTORY ${_LLDB_COMPAT_DIR})
-                file(GLOB _LLDB_FW_HEADERS "${LLDB_FRAMEWORK}/Headers/*.h")
-                foreach(_hdr ${_LLDB_FW_HEADERS})
-                    get_filename_component(_hdr_name ${_hdr} NAME)
-                    file(CREATE_LINK ${_hdr} "${_LLDB_COMPAT_DIR}/${_hdr_name}" SYMBOLIC)
-                endforeach()
-                set(LLDB_INCLUDE_DIR "${CMAKE_BINARY_DIR}/lldb-compat-headers")
+        elseif(LLDB_INCLUDE_DIR)
+            # No system framework — fall back to Homebrew's liblldb for both
+            find_library(LLDB_LIBRARY NAMES lldb liblldb
+                PATHS /usr/local/opt/llvm/lib /opt/homebrew/opt/llvm/lib)
+            if(LLDB_LIBRARY)
+                message(STATUS "LLDB (Homebrew): ${LLDB_LIBRARY}")
+                message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
+                set(HAS_LLDB TRUE)
             endif()
-            message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
         endif()
-    endif()
-
-    if(NOT HAS_LLDB)
-        # Linux / fallback: find liblldb from system LLVM packages or Homebrew
-        find_path(LLDB_INCLUDE_DIR lldb/API/SBDebugger.h
-            PATHS
-                /usr/lib/llvm-18/include
-                /usr/lib/llvm-17/include
-                /usr/lib/llvm-16/include
-                /usr/lib/llvm-15/include
-                /usr/lib/llvm-14/include
-                /usr/local/opt/llvm/include
-                /opt/homebrew/opt/llvm/include
-        )
+    else()
+        # Linux: find liblldb
         find_library(LLDB_LIBRARY NAMES lldb liblldb
             PATHS
                 /usr/lib/llvm-18/lib
@@ -74,7 +65,6 @@ if(ENABLE_LLDB)
                 /usr/local/opt/llvm/lib
                 /opt/homebrew/opt/llvm/lib
         )
-
         if(LLDB_INCLUDE_DIR AND LLDB_LIBRARY)
             message(STATUS "LLDB found: ${LLDB_LIBRARY}")
             message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
