@@ -12,7 +12,11 @@
 #include <cstdint>
 
 #ifdef HAS_LLDB
+#ifdef __APPLE__
+#include <LLDB/LLDB.h>
+#else
 #include <lldb/API/LLDB.h>
+#endif
 #endif
 
 struct DisassemblyLine {
