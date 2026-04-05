@@ -157,9 +157,10 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args)
     // Launch — stop at entry point (like x64dbg stops at system entry)
     lldb::SBError launchError;
     lldb::SBLaunchInfo launchInfo(argv.size() > 1 ? argv.data() : nullptr);
-    launchInfo.SetListener(m_listener);
     launchInfo.SetLaunchFlags(launchInfo.GetLaunchFlags() | lldb::eLaunchFlagStopAtEntry);
 
+    // Don't set custom listener during launch — on macOS this can interfere
+    // with the debugserver handshake. We'll hijack events after launch.
     m_process = m_target.Launch(launchInfo, launchError);
 
     if (launchError.Fail()) {
@@ -173,6 +174,13 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args)
     }
 
     emit outputReceived(QString("Process launched (PID: %1)").arg(m_process.GetProcessID()));
+
+    // Now that the process is launched, register our listener for future events
+    m_process.GetBroadcaster().AddListener(
+        m_listener,
+        lldb::SBProcess::eBroadcastBitStateChanged |
+        lldb::SBProcess::eBroadcastBitSTDOUT |
+        lldb::SBProcess::eBroadcastBitSTDERR);
 
     // Start event listener
     startEventListener();
