@@ -27,10 +27,28 @@ if(ENABLE_LLDB)
         if(LLDB_FRAMEWORK)
             message(STATUS "LLDB framework found: ${LLDB_FRAMEWORK}")
             set(LLDB_LIBRARY ${LLDB_FRAMEWORK})
-            # Framework headers are inside LLDB.framework/Headers
-            set(LLDB_INCLUDE_DIR "${LLDB_FRAMEWORK}/Headers")
             set(HAS_LLDB TRUE)
             set(LLDB_IS_FRAMEWORK TRUE)
+
+            # Determine header layout: the framework may have headers directly
+            # in Headers/ or nested under Headers/lldb/API/
+            if(EXISTS "${LLDB_FRAMEWORK}/Headers/lldb/API/LLDB.h")
+                # Nested layout — include path is Headers/
+                set(LLDB_INCLUDE_DIR "${LLDB_FRAMEWORK}/Headers")
+            elseif(EXISTS "${LLDB_FRAMEWORK}/Headers/LLDB.h")
+                # Flat layout — headers like LLDB.h, SBDebugger.h in Headers/
+                # Our code includes <lldb/API/LLDB.h>, so create a compatibility
+                # include directory with the expected structure
+                set(_LLDB_COMPAT_DIR "${CMAKE_BINARY_DIR}/lldb-compat-headers/lldb/API")
+                file(MAKE_DIRECTORY ${_LLDB_COMPAT_DIR})
+                file(GLOB _LLDB_FW_HEADERS "${LLDB_FRAMEWORK}/Headers/*.h")
+                foreach(_hdr ${_LLDB_FW_HEADERS})
+                    get_filename_component(_hdr_name ${_hdr} NAME)
+                    file(CREATE_LINK ${_hdr} "${_LLDB_COMPAT_DIR}/${_hdr_name}" SYMBOLIC)
+                endforeach()
+                set(LLDB_INCLUDE_DIR "${CMAKE_BINARY_DIR}/lldb-compat-headers")
+            endif()
+            message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
         endif()
     endif()
 
@@ -142,14 +160,7 @@ if(HAS_LLDB)
     target_compile_definitions(x64lldbg PRIVATE HAS_LLDB)
     target_link_libraries(x64lldbg PRIVATE ${LLDB_LIBRARY})
 
-    if(LLDB_IS_FRAMEWORK)
-        # macOS framework: headers are at LLDB.framework/Headers, but
-        # code includes <lldb/API/LLDB.h> so we point one level above
-        get_filename_component(_LLDB_FW_DIR ${LLDB_FRAMEWORK} DIRECTORY)
-        target_include_directories(x64lldbg PRIVATE ${_LLDB_FW_DIR})
-    else()
-        target_include_directories(x64lldbg PRIVATE ${LLDB_INCLUDE_DIR})
-    endif()
+    target_include_directories(x64lldbg PRIVATE ${LLDB_INCLUDE_DIR})
 
     # Smoke test (headless, no GUI)
     add_executable(smoke_test
@@ -162,9 +173,5 @@ if(HAS_LLDB)
     target_compile_definitions(smoke_test PRIVATE HAS_LLDB)
     target_link_libraries(smoke_test PRIVATE Qt6::Core Qt6::Gui ${LLDB_LIBRARY})
 
-    if(LLDB_IS_FRAMEWORK)
-        target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${_LLDB_FW_DIR})
-    else()
-        target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${LLDB_INCLUDE_DIR})
-    endif()
+    target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${LLDB_INCLUDE_DIR})
 endif()
