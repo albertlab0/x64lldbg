@@ -1,0 +1,19 @@
+# Build output
+build/
+
+# Reference code (not part of this project)
+ref/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
