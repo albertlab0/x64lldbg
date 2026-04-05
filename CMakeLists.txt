@@ -164,4 +164,13 @@ if(HAS_LLDB)
     target_link_libraries(smoke_test PRIVATE Qt6::Core Qt6::Gui ${LLDB_LIBRARY})
 
     target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${LLDB_INCLUDE_DIR})
+
+    # macOS: code-sign with debugger entitlement so we can launch/attach processes
+    if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/entitlements.plist")
+        add_custom_command(TARGET x64lldbg POST_BUILD
+            COMMAND codesign --force --sign - --entitlements
+                    "${CMAKE_SOURCE_DIR}/entitlements.plist" "$<TARGET_FILE:x64lldbg>"
+            COMMENT "Code-signing x64lldbg with debugger entitlement"
+        )
+    endif()
 endif()
