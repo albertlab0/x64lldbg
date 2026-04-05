@@ -83,6 +83,26 @@ DebugCore::DebugCore(QObject* parent)
     m_debugger.SetAsync(true);
     m_debugger.HandleCommand("settings set target.x86-disassembly-flavor intel");
     m_debugger.HandleCommand("settings set target.skip-prologue false");
+
+#ifdef __APPLE__
+    // Homebrew's LLVM doesn't ship debugserver. Set LLDB_DEBUGSERVER_PATH
+    // to the system one from Xcode or Command Line Tools.
+    if (qEnvironmentVariableIsEmpty("LLDB_DEBUGSERVER_PATH")) {
+        const char* debugserverPaths[] = {
+            "/Library/Developer/CommandLineTools/Library/PrivateFrameworks/"
+                "LLDB.framework/Versions/A/Resources/debugserver",
+            "/Applications/Xcode.app/Contents/SharedFrameworks/"
+                "LLDB.framework/Versions/A/Resources/debugserver",
+            nullptr
+        };
+        for (const char** p = debugserverPaths; *p; ++p) {
+            if (QFile::exists(*p)) {
+                qputenv("LLDB_DEBUGSERVER_PATH", *p);
+                break;
+            }
+        }
+    }
+#endif
     m_listener = m_debugger.GetListener();
 #endif
 }
