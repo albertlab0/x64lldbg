@@ -13,37 +13,59 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
 option(ENABLE_LLDB "Enable LLDB debugger backend" ON)
 
 if(ENABLE_LLDB)
-    # Try system package first
-    find_path(LLDB_INCLUDE_DIR lldb/API/SBDebugger.h
-        PATHS
-            /usr/lib/llvm-18/include
-            /usr/lib/llvm-17/include
-            /usr/lib/llvm-16/include
-            /usr/lib/llvm-15/include
-            /usr/lib/llvm-14/include
-            /usr/local/opt/llvm/include
-            /opt/homebrew/opt/llvm/include
-            /Library/Developer/CommandLineTools/Library/Frameworks/LLDB.framework/Headers
-    )
-    find_library(LLDB_LIBRARY NAMES lldb liblldb
-        PATHS
-            /usr/lib/llvm-18/lib
-            /usr/lib/llvm-17/lib
-            /usr/lib/llvm-16/lib
-            /usr/lib/llvm-15/lib
-            /usr/lib/llvm-14/lib
-            /usr/local/opt/llvm/lib
-            /opt/homebrew/opt/llvm/lib
-            /Library/Developer/CommandLineTools/Library/Frameworks
-    )
+    set(HAS_LLDB FALSE)
 
-    if(LLDB_INCLUDE_DIR AND LLDB_LIBRARY)
-        message(STATUS "LLDB found: ${LLDB_LIBRARY}")
-        message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
-        set(HAS_LLDB TRUE)
-    else()
+    if(APPLE)
+        # On macOS, prefer Xcode's LLDB.framework — its debugserver is properly
+        # code-signed. Homebrew's liblldb ships an unsigned debugserver that
+        # fails with "handshake packet timeout".
+        set(_XCODE_LLDB_PATHS
+            /Applications/Xcode.app/Contents/SharedFrameworks
+            /Library/Developer/CommandLineTools/Library/PrivateFrameworks
+        )
+        find_library(LLDB_FRAMEWORK LLDB PATHS ${_XCODE_LLDB_PATHS} NO_DEFAULT_PATH)
+        if(LLDB_FRAMEWORK)
+            message(STATUS "LLDB framework found: ${LLDB_FRAMEWORK}")
+            set(LLDB_LIBRARY ${LLDB_FRAMEWORK})
+            # Framework headers are inside LLDB.framework/Headers
+            set(LLDB_INCLUDE_DIR "${LLDB_FRAMEWORK}/Headers")
+            set(HAS_LLDB TRUE)
+            set(LLDB_IS_FRAMEWORK TRUE)
+        endif()
+    endif()
+
+    if(NOT HAS_LLDB)
+        # Linux / fallback: find liblldb from system LLVM packages or Homebrew
+        find_path(LLDB_INCLUDE_DIR lldb/API/SBDebugger.h
+            PATHS
+                /usr/lib/llvm-18/include
+                /usr/lib/llvm-17/include
+                /usr/lib/llvm-16/include
+                /usr/lib/llvm-15/include
+                /usr/lib/llvm-14/include
+                /usr/local/opt/llvm/include
+                /opt/homebrew/opt/llvm/include
+        )
+        find_library(LLDB_LIBRARY NAMES lldb liblldb
+            PATHS
+                /usr/lib/llvm-18/lib
+                /usr/lib/llvm-17/lib
+                /usr/lib/llvm-16/lib
+                /usr/lib/llvm-15/lib
+                /usr/lib/llvm-14/lib
+                /usr/local/opt/llvm/lib
+                /opt/homebrew/opt/llvm/lib
+        )
+
+        if(LLDB_INCLUDE_DIR AND LLDB_LIBRARY)
+            message(STATUS "LLDB found: ${LLDB_LIBRARY}")
+            message(STATUS "LLDB headers: ${LLDB_INCLUDE_DIR}")
+            set(HAS_LLDB TRUE)
+        endif()
+    endif()
+
+    if(NOT HAS_LLDB)
         message(WARNING "LLDB not found -- building UI-only (no debug backend)")
-        set(HAS_LLDB FALSE)
     endif()
 else()
     set(HAS_LLDB FALSE)
@@ -118,8 +140,16 @@ target_link_libraries(x64lldbg PRIVATE
 
 if(HAS_LLDB)
     target_compile_definitions(x64lldbg PRIVATE HAS_LLDB)
-    target_include_directories(x64lldbg PRIVATE ${LLDB_INCLUDE_DIR})
     target_link_libraries(x64lldbg PRIVATE ${LLDB_LIBRARY})
+
+    if(LLDB_IS_FRAMEWORK)
+        # macOS framework: headers are at LLDB.framework/Headers, but
+        # code includes <lldb/API/LLDB.h> so we point one level above
+        get_filename_component(_LLDB_FW_DIR ${LLDB_FRAMEWORK} DIRECTORY)
+        target_include_directories(x64lldbg PRIVATE ${_LLDB_FW_DIR})
+    else()
+        target_include_directories(x64lldbg PRIVATE ${LLDB_INCLUDE_DIR})
+    endif()
 
     # Smoke test (headless, no GUI)
     add_executable(smoke_test
@@ -129,7 +159,12 @@ if(HAS_LLDB)
         src/common/Configuration.h
         src/common/Configuration.cpp
     )
-    target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${LLDB_INCLUDE_DIR})
     target_compile_definitions(smoke_test PRIVATE HAS_LLDB)
     target_link_libraries(smoke_test PRIVATE Qt6::Core Qt6::Gui ${LLDB_LIBRARY})
+
+    if(LLDB_IS_FRAMEWORK)
+        target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${_LLDB_FW_DIR})
+    else()
+        target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR}/src ${LLDB_INCLUDE_DIR})
+    endif()
 endif()
