@@ -91,8 +91,11 @@ void CPUDumpView::populate()
 {
     if (m_baseAddress == 0) {
         setRowCount(0);
+        horizontalHeader()->setVisible(false);
         return;
     }
+
+    horizontalHeader()->setVisible(true);
 
     int rows = 20;
     setRowCount(rows);
@@ -137,6 +140,8 @@ void CPUDumpView::paintEvent(QPaintEvent* event)
 {
     // Draw the table first
     QTableWidget::paintEvent(event);
+
+    if (m_baseAddress == 0) return;  // nothing to decorate when empty
 
     // Draw vertical separator lines every 4 bytes (like x64dbg)
     QPainter painter(viewport());
