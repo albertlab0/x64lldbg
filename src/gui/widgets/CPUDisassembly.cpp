@@ -454,8 +454,9 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     int viewHeight = viewport()->height();
     int xOffset = -horizontalScrollBar()->value();
 
-    // Draw a vertical line at the right edge of each column except the last
-    for (int col = 0; col < columnCount() - 1; col++) {
+    // Draw vertical separators after Address and Bytes columns only.
+    // Mnemonic and Operands share the "Disassembly" area (no separator).
+    for (int col = 0; col < 2; col++) {
         xOffset += columnWidth(col);
         painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
     }
