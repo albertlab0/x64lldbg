@@ -197,47 +197,74 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args, const Q
 
     emit outputReceived("Target created: " + path);
 
-    // Set a breakpoint at main (like x64dbg's "system breakpoint" + entry)
+    // --- Set default breakpoints (like x64dbg's system breakpoint behavior) ---
+    lldb::SBModule module = m_target.GetModuleAtIndex(0);
+
+    // 1. Breakpoint at main (if it exists)
     lldb::SBBreakpoint mainBp = m_target.BreakpointCreateByName("main");
     if (mainBp.IsValid() && mainBp.GetNumLocations() > 0) {
         emit outputReceived(QString("Breakpoint set at main (id=%1)").arg(mainBp.GetID()));
     } else {
-        // No main symbol — try to set breakpoint at the binary's entry point
         if (mainBp.IsValid())
             m_target.BreakpointDelete(mainBp.GetID());
 
-        // Get entry point address from the module's object file header
-        lldb::SBModule module = m_target.GetModuleAtIndex(0);
-        if (module.IsValid()) {
-            // Look for common entry symbols
-            const char* entryNames[] = {"_start", "start", "_main", "entry", nullptr};
-            bool found = false;
-            for (const char** name = entryNames; *name; ++name) {
-                lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(*name);
+        // No main — try common entry point symbols
+        const char* entryNames[] = {"_start", "start", "_main", "entry", nullptr};
+        bool found = false;
+        for (const char** name = entryNames; *name; ++name) {
+            lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(*name);
+            if (bp.IsValid() && bp.GetNumLocations() > 0) {
+                emit outputReceived(QString("Breakpoint set at %1 (id=%2)")
+                    .arg(*name).arg(bp.GetID()));
+                found = true;
+                break;
+            } else if (bp.IsValid()) {
+                m_target.BreakpointDelete(bp.GetID());
+            }
+        }
+
+        if (!found && module.IsValid()) {
+            // Last resort: entry point from object file header (LC_MAIN / ELF e_entry)
+            lldb::SBAddress entryAddr = module.GetObjectFileEntryPointAddress();
+            if (entryAddr.IsValid()) {
+                lldb::SBBreakpoint entryBp = m_target.BreakpointCreateBySBAddress(entryAddr);
+                if (entryBp.IsValid()) {
+                    uint64_t addr = entryAddr.GetLoadAddress(m_target);
+                    if (addr == UINT64_MAX)
+                        addr = entryAddr.GetFileAddress();
+                    emit outputReceived(QString("Breakpoint set at entry point 0x%1 (id=%2)")
+                        .arg(addr, 0, 16).arg(entryBp.GetID()));
+                }
+            } else {
+                emit outputReceived("Warning: no main or entry point found");
+            }
+        }
+    }
+
+    // 2. Breakpoints on Mach-O initializer functions (__mod_init_func)
+    //    These run before main/start — malware often hides payload here.
+    if (module.IsValid()) {
+        uint32_t numSymbols = module.GetNumSymbols();
+        for (uint32_t i = 0; i < numSymbols; i++) {
+            lldb::SBSymbol sym = module.GetSymbolAtIndex(i);
+            if (!sym.IsValid()) continue;
+
+            const char* name = sym.GetName();
+            if (!name) continue;
+            QString symName(name);
+
+            // Match InitFunc_N, mod_init_func, __mod_init_func patterns
+            if (symName.startsWith("InitFunc_") ||
+                symName.contains("mod_init_func") ||
+                symName.startsWith("__GLOBAL__sub_I_") ||  // C++ global constructors
+                symName.startsWith("_GLOBAL__sub_I_")) {
+
+                lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(name);
                 if (bp.IsValid() && bp.GetNumLocations() > 0) {
-                    emit outputReceived(QString("Breakpoint set at %1 (id=%2)")
-                        .arg(*name).arg(bp.GetID()));
-                    found = true;
-                    break;
+                    emit outputReceived(QString("Breakpoint set at initializer %1 (id=%2)")
+                        .arg(symName).arg(bp.GetID()));
                 } else if (bp.IsValid()) {
                     m_target.BreakpointDelete(bp.GetID());
-                }
-            }
-
-            if (!found) {
-                // Last resort: get entry point from object file header
-                lldb::SBAddress entryAddr = module.GetObjectFileEntryPointAddress();
-                if (entryAddr.IsValid()) {
-                    lldb::SBBreakpoint entryBp = m_target.BreakpointCreateBySBAddress(entryAddr);
-                    if (entryBp.IsValid()) {
-                        uint64_t addr = entryAddr.GetLoadAddress(m_target);
-                        if (addr == UINT64_MAX)
-                            addr = entryAddr.GetFileAddress();
-                        emit outputReceived(QString("Breakpoint set at entry point 0x%1 (id=%2)")
-                            .arg(addr, 0, 16).arg(entryBp.GetID()));
-                    }
-                } else {
-                    emit outputReceived("Warning: no main or entry point found");
                 }
             }
         }
