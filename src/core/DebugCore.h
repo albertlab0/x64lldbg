@@ -166,6 +166,7 @@ public:
 
     // --- Target info ---
     QString targetPath() const { return m_targetPath; }
+    uint64_t mainModuleBase();
 
 signals:
     void processStateChanged(DebugCore::ProcessState state);

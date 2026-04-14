@@ -17,7 +17,7 @@ CPUDumpView::CPUDumpView(DebugCore* debugCore, QWidget* parent)
 {
     setupColumns();
     applyStyle();
-    populate();
+    // Start empty — dump is populated when debugger provides an address
 }
 
 void CPUDumpView::setupColumns()
@@ -89,6 +89,11 @@ void CPUDumpView::applyStyle()
 
 void CPUDumpView::populate()
 {
+    if (m_baseAddress == 0) {
+        setRowCount(0);
+        return;
+    }
+
     int rows = 20;
     setRowCount(rows);
 

@@ -316,6 +316,18 @@ void MainWindow::connectSignals()
     connect(m_cpuWidget->getDisassembly(), &CPUDisassembly::addressSelected,
             m_cpuWidget->getInfoBox(), &CPUInfoBox::updateInfo);
 
+    // On first stop, navigate dump to the main module's image base
+    connect(m_debugCore, &DebugCore::processStateChanged,
+            this, [this, dumpInitialized = std::make_shared<bool>(false)](int state) {
+        if (!*dumpInitialized && state == DebugCore::Stopped) {
+            uint64_t base = m_debugCore->mainModuleBase();
+            if (base != 0) {
+                m_cpuWidget->getDump()->goToAddress(base);
+                *dumpInitialized = true;
+            }
+        }
+    });
+
     // Breakpoint double-click → switch to CPU tab and navigate
     connect(m_breakpointsView, &BreakpointsView::breakpointDoubleClicked,
             this, [this](uint64_t address) {

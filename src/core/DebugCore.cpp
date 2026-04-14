@@ -1231,6 +1231,31 @@ QString DebugCore::getSymbolAt(uint64_t address)
 
 // --- Symbol lookup ---
 
+uint64_t DebugCore::mainModuleBase()
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return 0;
+
+    lldb::SBModule module = m_target.GetModuleAtIndex(0);
+    if (!module.IsValid()) return 0;
+
+    // Get the first section's load address as the module base
+    lldb::SBSection textSect = module.FindSection("__TEXT");
+    if (textSect.IsValid())
+        return textSect.GetLoadAddress(m_target);
+
+    // Fallback: first section
+    if (module.GetNumSections() > 0) {
+        lldb::SBSection sect = module.GetSectionAtIndex(0);
+        if (sect.IsValid())
+            return sect.GetLoadAddress(m_target);
+    }
+    return 0;
+#else
+    return 0;
+#endif
+}
+
 uint64_t DebugCore::findSymbolAddress(const QString& name)
 {
 #ifdef HAS_LLDB

@@ -23,7 +23,7 @@ private:
     void paintEvent(QPaintEvent* event) override;
 
     DebugCore* m_debugCore;
-    uint64_t m_baseAddress = 0x00400000;
+    uint64_t m_baseAddress = 0;  // 0 = empty until debugger provides an address
 };
 
 // Tabbed container with Dump 1-5 tabs, like x64dbg
