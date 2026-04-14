@@ -489,17 +489,18 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
         painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
     }
 
-    // Draw inline jump direction arrows (x64dbg-style)
-    // Small up/down arrows at the left edge of the Bytes column for jump instructions
+    // ── Inline jump graphics (x64dbg-style) ──
     if (m_lines.isEmpty()) return;
 
     QColor arrowColor = ConfigColor("DisassemblyJumpArrowColor");
     int rowHeight = verticalHeader()->defaultSectionSize();
 
-    // Calculate the X position: left side of the Bytes column (col 1)
+    // X positions within the Bytes column
     int bytesColLeft = columnWidth(0) - hScroll;
-    int arrowX = bytesColLeft + 4;  // small indent into bytes column
+    int smallArrowX = bytesColLeft + 4;   // small triangle indicators
+    int lineX       = bytesColLeft + 12;  // full flow line for selected jump
 
+    // ── 1. Small triangle indicators for ALL jump instructions ──
     for (int i = 0; i < m_lines.size(); i++) {
         const auto& line = m_lines[i];
         if (line.branchTarget == 0 || !line.mnemonic.startsWith('j'))
@@ -507,31 +508,123 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
 
         int rowTop = rowViewportPosition(i);
         if (rowTop < -rowHeight || rowTop > viewHeight)
-            continue;  // off-screen
+            continue;
 
         int cy = rowTop + rowHeight / 2;
-        int sz = 3;  // arrow half-size
+        int sz = 3;
 
         painter.setPen(Qt::NoPen);
         painter.setBrush(arrowColor);
 
         if (line.branchTarget < line.address) {
-            // Jump goes UP — draw upward triangle
             QPoint tri[3] = {
-                QPoint(arrowX, cy - sz),       // top (tip)
-                QPoint(arrowX - sz, cy + sz),  // bottom-left
-                QPoint(arrowX + sz, cy + sz),  // bottom-right
+                QPoint(smallArrowX, cy - sz),
+                QPoint(smallArrowX - sz, cy + sz),
+                QPoint(smallArrowX + sz, cy + sz),
             };
             painter.drawPolygon(tri, 3);
         } else {
-            // Jump goes DOWN — draw downward triangle
             QPoint tri[3] = {
-                QPoint(arrowX, cy + sz),       // bottom (tip)
-                QPoint(arrowX - sz, cy - sz),  // top-left
-                QPoint(arrowX + sz, cy - sz),  // top-right
+                QPoint(smallArrowX, cy + sz),
+                QPoint(smallArrowX - sz, cy - sz),
+                QPoint(smallArrowX + sz, cy - sz),
             };
             painter.drawPolygon(tri, 3);
         }
+    }
+
+    // ── 2. Full flow line for the SELECTED jump instruction ──
+    int selRow = currentRow();
+    if (selRow < 0 || selRow >= m_lines.size())
+        return;
+
+    const auto& selLine = m_lines[selRow];
+    if (!selLine.mnemonic.startsWith('j') || selLine.branchTarget == 0)
+        return;
+
+    // Find destination row
+    int destRow = -1;  // -1 = above viewport
+    bool destFound = false;
+    for (int j = 0; j < m_lines.size(); j++) {
+        if (m_lines[j].address == selLine.branchTarget) {
+            destRow = j;
+            destFound = true;
+            break;
+        }
+    }
+    if (!destFound) {
+        if (selLine.branchTarget > m_lines.last().address)
+            destRow = m_lines.size();  // below viewport
+    }
+
+    int minRow = qMin(selRow, destRow);
+    int maxRow = qMax(selRow, destRow);
+
+    QPen flowPen(arrowColor, 1.5);
+    painter.setPen(flowPen);
+    painter.setBrush(Qt::NoBrush);
+
+    for (int i = 0; i < m_lines.size(); i++) {
+        int rowTop = rowViewportPosition(i);
+        if (rowTop < -rowHeight || rowTop > viewHeight)
+            continue;
+
+        int cy = rowTop + rowHeight / 2;
+
+        if (i < minRow || i > maxRow)
+            continue;  // not part of this jump's path
+
+        bool isSrc  = (i == selRow);
+        bool isDest = (i == destRow);
+        bool isMid  = (!isSrc && !isDest);
+
+        if (isSrc && isDest) {
+            // Self-loop (shouldn't happen for jumps but handle it)
+            continue;
+        }
+
+        if (isMid) {
+            // Vertical line through entire row
+            painter.drawLine(lineX, rowTop, lineX, rowTop + rowHeight);
+        } else if (isSrc) {
+            // Foot: horizontal connector + vertical toward destination
+            painter.drawLine(lineX, cy, lineX + 5, cy);
+            if (destRow < selRow)
+                painter.drawLine(lineX, rowTop, lineX, cy);
+            else
+                painter.drawLine(lineX, cy, lineX, rowTop + rowHeight);
+        } else if (isDest) {
+            // Head: horizontal connector + arrowhead + vertical from source
+            painter.drawLine(lineX, cy, lineX + 5, cy);
+
+            // Arrowhead pointing right
+            QPoint pts[3] = {
+                QPoint(lineX + 3, cy - 2),
+                QPoint(lineX + 5, cy),
+                QPoint(lineX + 3, cy + 2),
+            };
+            painter.drawPolyline(pts, 3);
+
+            if (selRow < destRow)
+                painter.drawLine(lineX, rowTop, lineX, cy);
+            else
+                painter.drawLine(lineX, cy, lineX, rowTop + rowHeight);
+        }
+    }
+
+    // Handle off-screen destination: draw vertical to viewport edge
+    if (destRow < 0) {
+        // Destination above viewport — vertical from source to top
+        int srcTop = rowViewportPosition(selRow);
+        int srcCy = srcTop + rowHeight / 2;
+        painter.drawLine(lineX, 0, lineX, srcCy);
+        painter.drawLine(lineX, srcCy, lineX + 5, srcCy);
+    } else if (destRow >= m_lines.size()) {
+        // Destination below viewport — vertical from source to bottom
+        int srcTop = rowViewportPosition(selRow);
+        int srcCy = srcTop + rowHeight / 2;
+        painter.drawLine(lineX, srcCy, lineX, viewHeight);
+        painter.drawLine(lineX, srcCy, lineX + 5, srcCy);
     }
 }
 
