@@ -242,26 +242,85 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args, const Q
     }
 
     // 2. Breakpoints on Mach-O initializer functions (__mod_init_func)
-    //    These run before main/start — malware often hides payload here.
+    //    and ELF .init_array. These run before main/start.
     if (module.IsValid()) {
+        uint32_t numSections = module.GetNumSections();
+        for (uint32_t i = 0; i < numSections; i++) {
+            lldb::SBSection section = module.GetSectionAtIndex(i);
+            if (!section.IsValid()) continue;
+
+            // Check top-level sections and subsections
+            auto checkSection = [&](lldb::SBSection sec) {
+                const char* secName = sec.GetName();
+                if (!secName) return;
+                QString name(secName);
+
+                // Mach-O: __mod_init_func, ELF: .init_array
+                if (name != "__mod_init_func" && name != ".init_array")
+                    return;
+
+                size_t ptrSize = (m_target.GetAddressByteSize() > 0)
+                    ? m_target.GetAddressByteSize() : 8;
+                size_t secSize = sec.GetByteSize();
+                size_t numPtrs = secSize / ptrSize;
+
+                if (numPtrs == 0) return;
+
+                emit outputReceived(QString("Found %1 initializer(s) in %2")
+                    .arg(numPtrs).arg(name));
+
+                // Read the section to get function pointer addresses
+                // We need the file address of the section start, then compute
+                // each pointer's file address
+                lldb::SBData secData = sec.GetSectionData();
+                if (!secData.IsValid()) return;
+
+                lldb::SBError err;
+                for (size_t j = 0; j < numPtrs; j++) {
+                    uint64_t funcAddr = 0;
+                    if (ptrSize == 8)
+                        funcAddr = secData.GetUnsignedInt64(err, j * ptrSize);
+                    else
+                        funcAddr = secData.GetUnsignedInt32(err, j * ptrSize);
+
+                    if (err.Fail() || funcAddr == 0) continue;
+
+                    lldb::SBAddress sbAddr(funcAddr, m_target);
+                    lldb::SBBreakpoint bp = m_target.BreakpointCreateBySBAddress(sbAddr);
+                    if (bp.IsValid()) {
+                        // Try to get symbol name for logging
+                        QString label = QString("InitFunc_%1").arg(j);
+                        lldb::SBSymbol sym = sbAddr.GetSymbol();
+                        if (sym.IsValid() && sym.GetName())
+                            label = sym.GetName();
+
+                        emit outputReceived(QString("Breakpoint set at initializer %1 = 0x%2 (id=%3)")
+                            .arg(label)
+                            .arg(funcAddr, 0, 16)
+                            .arg(bp.GetID()));
+                    }
+                }
+            };
+
+            checkSection(section);
+            // Also check subsections (Mach-O nests __mod_init_func under __DATA)
+            uint32_t numSub = section.GetNumSubSections();
+            for (uint32_t j = 0; j < numSub; j++) {
+                checkSection(section.GetSubSectionAtIndex(j));
+            }
+        }
+
+        // Also check for C++ global constructors by symbol name
         uint32_t numSymbols = module.GetNumSymbols();
         for (uint32_t i = 0; i < numSymbols; i++) {
             lldb::SBSymbol sym = module.GetSymbolAtIndex(i);
-            if (!sym.IsValid()) continue;
-
-            const char* name = sym.GetName();
-            if (!name) continue;
-            QString symName(name);
-
-            // Match InitFunc_N, mod_init_func, __mod_init_func patterns
-            if (symName.startsWith("InitFunc_") ||
-                symName.contains("mod_init_func") ||
-                symName.startsWith("__GLOBAL__sub_I_") ||  // C++ global constructors
+            if (!sym.IsValid() || !sym.GetName()) continue;
+            QString symName(sym.GetName());
+            if (symName.startsWith("__GLOBAL__sub_I_") ||
                 symName.startsWith("_GLOBAL__sub_I_")) {
-
-                lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(name);
+                lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(sym.GetName());
                 if (bp.IsValid() && bp.GetNumLocations() > 0) {
-                    emit outputReceived(QString("Breakpoint set at initializer %1 (id=%2)")
+                    emit outputReceived(QString("Breakpoint set at C++ init %1 (id=%2)")
                         .arg(symName).arg(bp.GetID()));
                 } else if (bp.IsValid()) {
                     m_target.BreakpointDelete(bp.GetID());
