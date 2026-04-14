@@ -473,20 +473,65 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     // Let QTableWidget paint everything first
     QTableWidget::paintEvent(event);
 
-    // Draw vertical separator lines between columns (x64dbg style)
     QPainter painter(viewport());
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    int viewHeight = viewport()->height();
+    int hScroll = horizontalScrollBar()->value();
+
+    // Draw vertical separator lines between columns (x64dbg style)
     QColor sepColor = ConfigColor("TableGridColor");
     painter.setPen(QPen(sepColor, 1));
 
-    int viewHeight = viewport()->height();
-    int xOffset = -horizontalScrollBar()->value();
-
-    // Draw vertical separators after Address, Bytes, and Operands.
-    // No separator between Mnemonic and Operands (they form "Disassembly").
+    int xOffset = -hScroll;
     for (int col = 0; col < columnCount() - 1; col++) {
         xOffset += columnWidth(col);
         if (col == 2) continue;  // skip separator after Mnemonic
         painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
+    }
+
+    // Draw inline jump direction arrows (x64dbg-style)
+    // Small up/down arrows at the left edge of the Bytes column for jump instructions
+    if (m_lines.isEmpty()) return;
+
+    QColor arrowColor = ConfigColor("DisassemblyJumpArrowColor");
+    int rowHeight = verticalHeader()->defaultSectionSize();
+
+    // Calculate the X position: left side of the Bytes column (col 1)
+    int bytesColLeft = columnWidth(0) - hScroll;
+    int arrowX = bytesColLeft + 4;  // small indent into bytes column
+
+    for (int i = 0; i < m_lines.size(); i++) {
+        const auto& line = m_lines[i];
+        if (line.branchTarget == 0 || !line.mnemonic.startsWith('j'))
+            continue;
+
+        int rowTop = rowViewportPosition(i);
+        if (rowTop < -rowHeight || rowTop > viewHeight)
+            continue;  // off-screen
+
+        int cy = rowTop + rowHeight / 2;
+        int sz = 3;  // arrow half-size
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(arrowColor);
+
+        if (line.branchTarget < line.address) {
+            // Jump goes UP — draw upward triangle
+            QPoint tri[3] = {
+                QPoint(arrowX, cy - sz),       // top (tip)
+                QPoint(arrowX - sz, cy + sz),  // bottom-left
+                QPoint(arrowX + sz, cy + sz),  // bottom-right
+            };
+            painter.drawPolygon(tri, 3);
+        } else {
+            // Jump goes DOWN — draw downward triangle
+            QPoint tri[3] = {
+                QPoint(arrowX, cy + sz),       // bottom (tip)
+                QPoint(arrowX - sz, cy - sz),  // top-left
+                QPoint(arrowX + sz, cy - sz),  // top-right
+            };
+            painter.drawPolygon(tri, 3);
+        }
     }
 }
 
