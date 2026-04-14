@@ -17,7 +17,9 @@ CPUDumpView::CPUDumpView(DebugCore* debugCore, QWidget* parent)
 {
     setupColumns();
     applyStyle();
-    // Start empty — dump is populated when debugger provides an address
+    // Start empty — hide header and columns until debugger provides an address
+    horizontalHeader()->setVisible(false);
+    setColumnCount(0);
 }
 
 void CPUDumpView::setupColumns()
@@ -95,6 +97,9 @@ void CPUDumpView::populate()
         return;
     }
 
+    // Restore columns if this is the first populate
+    if (columnCount() == 0)
+        setupColumns();
     horizontalHeader()->setVisible(true);
 
     int rows = 20;
