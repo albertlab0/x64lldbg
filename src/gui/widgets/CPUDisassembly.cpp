@@ -174,10 +174,10 @@ QColor CPUDisassembly::colorForMnemonic(const QString& mnemonic) const
         return ConfigColor("DisassemblyRetColor");
     if (mnemonic == "nop" || mnemonic == "nopw" || mnemonic == "nopl")
         return ConfigColor("DisassemblyNopColor");
-    // Unconditional jump: black text (x64dbg: InstructionUnconditionalJumpColor = #000000)
+    // Unconditional jump
     if (mnemonic == "jmp" || mnemonic == "jmpq")
-        return ConfigColor("DisassemblyMnemonicColor");
-    // Conditional jumps: red text
+        return ConfigColor("DisassemblyUnconditionalJumpColor");
+    // Conditional jumps
     if (mnemonic.startsWith('j'))
         return ConfigColor("DisassemblyConditionalJumpColor");
     if (mnemonic == "push" || mnemonic == "pushq" || mnemonic == "pop" || mnemonic == "popq")
@@ -294,9 +294,12 @@ void CPUDisassembly::rebuildTable()
         mnemItem->setForeground(colorForMnemonic(line.mnemonic));
         setItem(i, 2, mnemItem);
 
-        // Operands — always default operand color
+        // Operands — address operands (for call/jmp) use a distinct color
         auto* operItem = new QTableWidgetItem(line.operands);
-        operItem->setForeground(operColor);
+        bool isBranch = line.mnemonic.startsWith('j') ||
+                        line.mnemonic == "call" || line.mnemonic == "callq";
+        operItem->setForeground(isBranch ?
+            ConfigColor("DisassemblyAddressOperandColor") : operColor);
         setItem(i, 3, operItem);
 
         // Comments
@@ -333,18 +336,6 @@ void CPUDisassembly::rebuildTable()
                     it->setBackground(gotoBg);
             }
         }
-        // x64dbg-style: calls/jumps/rets get colored background only in
-        // the disassembly area (mnemonic + operands), not address/bytes
-        if (!isIP && !isBP && !isGoto) {
-            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
-            if (mnemBg.isValid()) {
-                for (int col = 2; col <= 3; col++) {
-                    if (auto* it = item(i, col))
-                        it->setBackground(mnemBg);
-                }
-            }
-        }
-
         // Scroll to goto target or IP row
         if (isGoto) {
             blockSignals(true);
@@ -416,17 +407,18 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
                 }
             }
         } else {
-            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
+            bool isBranch = line.mnemonic.startsWith('j') ||
+                            line.mnemonic == "call" || line.mnemonic == "callq";
+            QColor opColor = isBranch ?
+                ConfigColor("DisassemblyAddressOperandColor") : operColor;
             for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    // Disassembly columns (2,3) get mnemonic bg if applicable
-                    bool isDisasmCol = (col == 2 || col == 3);
-                    it->setBackground((isDisasmCol && mnemBg.isValid()) ? mnemBg : defaultBg);
+                    it->setBackground(defaultBg);
                     switch (col) {
                     case 0: it->setForeground(addrColor); break;
                     case 1: it->setForeground(bytesColor); break;
                     case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
-                    case 3: it->setForeground(operColor); break;
+                    case 3: it->setForeground(opColor); break;
                     case 4: it->setForeground(commentColor); break;
                     }
                 }

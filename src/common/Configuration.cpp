@@ -57,15 +57,13 @@ void Configuration::loadX64dbgDefaultColors()
     m_colors["DisassemblyCommentColor"]            = QColor("#008300");
     m_colors["DisassemblyLabelColor"]              = QColor("#FF0000");
     m_colors["DisassemblyJumpArrowColor"]          = QColor("#000000");
-    m_colors["DisassemblyConditionalJumpColor"]    = QColor("#FF0000");
-    m_colors["DisassemblyCallColor"]               = QColor("#000000");
-    m_colors["DisassemblyRetColor"]                = QColor("#000000");
+    m_colors["DisassemblyConditionalJumpColor"]    = QColor("#FF0000");  // red for jcc
+    m_colors["DisassemblyUnconditionalJumpColor"]  = QColor("#FF0000");  // red for jmp
+    m_colors["DisassemblyCallColor"]               = QColor("#00868B");  // dark cyan for call
+    m_colors["DisassemblyRetColor"]                = QColor("#00868B");  // dark cyan for ret
     m_colors["DisassemblyNopColor"]                = QColor("#808080");
     m_colors["DisassemblyPushPopColor"]            = QColor("#0000FF");
-
-    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#FFFF00");
-    m_colors["DisassemblyCallBgColor"]             = QColor("#00FFFF");
-    m_colors["DisassemblyRetBgColor"]              = QColor("#00FFFF");
+    m_colors["DisassemblyAddressOperandColor"]     = QColor("#828200");  // yellow/gold for address operands
 
     m_colors["BreakpointBackgroundColor"]          = QColor("#FF0000");
     m_colors["BreakpointColor"]                    = QColor("#FF0000");
@@ -135,14 +133,12 @@ void Configuration::loadModernLightColors()
     m_colors["DisassemblyLabelColor"]              = QColor("#1D6FB5");
     m_colors["DisassemblyJumpArrowColor"]          = QColor("#1A1A2E");
     m_colors["DisassemblyConditionalJumpColor"]    = QColor("#C03030");
-    m_colors["DisassemblyCallColor"]               = QColor("#1A1A2E");
-    m_colors["DisassemblyRetColor"]                = QColor("#1A1A2E");
+    m_colors["DisassemblyUnconditionalJumpColor"]  = QColor("#C03030");
+    m_colors["DisassemblyCallColor"]               = QColor("#1D6FB5");
+    m_colors["DisassemblyRetColor"]                = QColor("#1D6FB5");
     m_colors["DisassemblyNopColor"]                = QColor("#8B8B9A");
     m_colors["DisassemblyPushPopColor"]            = QColor("#1D6FB5");
-
-    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#FFF5D6");
-    m_colors["DisassemblyCallBgColor"]             = QColor("#E0F4F8");
-    m_colors["DisassemblyRetBgColor"]              = QColor("#E0F4F8");
+    m_colors["DisassemblyAddressOperandColor"]     = QColor("#9B6700");
 
     m_colors["BreakpointBackgroundColor"]          = QColor("#FFE0E0");
     m_colors["BreakpointColor"]                    = QColor("#E53E3E");
@@ -212,15 +208,12 @@ void Configuration::loadCutterDarkColors()
     m_colors["DisassemblyLabelColor"]              = QColor("#328cff");  // Cutter blue
     m_colors["DisassemblyJumpArrowColor"]          = QColor("#eff0f1");
     m_colors["DisassemblyConditionalJumpColor"]    = QColor("#e95656");  // Cutter red
-    m_colors["DisassemblyCallColor"]               = QColor("#328cff");  // Cutter blue
-    m_colors["DisassemblyRetColor"]                = QColor("#e95656");  // Cutter red
+    m_colors["DisassemblyUnconditionalJumpColor"]  = QColor("#e95656");  // Cutter red
+    m_colors["DisassemblyCallColor"]               = QColor("#42eef4");  // Cutter cyan
+    m_colors["DisassemblyRetColor"]                = QColor("#42eef4");  // Cutter cyan
     m_colors["DisassemblyNopColor"]                = QColor("#555d66");
-    m_colors["DisassemblyPushPopColor"]            = QColor("#42eef4");  // Cutter cyan
-
-    // Row highlights — dark-appropriate muted versions
-    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#3a3520");
-    m_colors["DisassemblyCallBgColor"]             = QColor("#1e3040");
-    m_colors["DisassemblyRetBgColor"]              = QColor("#3a2020");
+    m_colors["DisassemblyPushPopColor"]            = QColor("#328cff");  // Cutter blue
+    m_colors["DisassemblyAddressOperandColor"]     = QColor("#dda368");  // Cutter orange for addresses
 
     // Breakpoints
     m_colors["BreakpointBackgroundColor"]          = QColor("#8c4c4c");
