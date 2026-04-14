@@ -271,7 +271,7 @@ void CPUDisassembly::rebuildTable()
 
         // Address
         auto* addrItem = new QTableWidgetItem(
-            QString("0x%1").arg(line.address, 16, 16, QChar('0'))
+            QString("%1").arg(line.address, 16, 16, QChar('0')).toUpper()
         );
         addrItem->setForeground(addrColor);
         setItem(i, 0, addrItem);
