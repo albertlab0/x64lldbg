@@ -308,6 +308,13 @@ void CPUDisassembly::rebuildTable()
         commentItem->setForeground(commentColor);
         setItem(i, 4, commentItem);
 
+        // x64dbg-style instruction-type background on disassembly columns only
+        QColor mnBg = bgColorForMnemonic(line.mnemonic);
+        if (mnBg.isValid()) {
+            if (auto* it = item(i, 2)) it->setBackground(mnBg);
+            if (auto* it = item(i, 3)) it->setBackground(mnBg);
+        }
+
         // Highlight current IP, breakpoints, goto target
         bool isIP = (line.address == pc);
         bool isBP = bpAddresses.contains(line.address);
@@ -389,31 +396,37 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
                 }
             }
         } else if (isBP) {
-            // x64dbg style: only address column highlighted red
-            for (int col = 0; col < 5; col++) {
-                if (auto* it = item(i, col)) {
-                    if (col == 0) {
-                        it->setBackground(bpBg);
-                        it->setForeground(cipText); // white on red
-                    } else {
-                        it->setBackground(defaultBg);
-                        switch (col) {
-                        case 1: it->setForeground(bytesColor); break;
-                        case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
-                        case 3: it->setForeground(operColor); break;
-                        case 4: it->setForeground(commentColor); break;
-                        }
-                    }
-                }
-            }
-        } else {
+            // x64dbg style: address column red, disasm columns keep instruction bg
+            QColor mnBg = bgColorForMnemonic(line.mnemonic);
             bool isBranch = line.mnemonic.startsWith('j') ||
                             line.mnemonic == "call" || line.mnemonic == "callq";
             QColor opColor = isBranch ?
                 ConfigColor("DisassemblyAddressOperandColor") : operColor;
             for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    it->setBackground(defaultBg);
+                    if (col == 0) {
+                        it->setBackground(bpBg);
+                        it->setForeground(cipText); // white on red
+                    } else {
+                        it->setBackground((col == 2 || col == 3) && mnBg.isValid() ? mnBg : defaultBg);
+                        switch (col) {
+                        case 1: it->setForeground(bytesColor); break;
+                        case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
+                        case 3: it->setForeground(opColor); break;
+                        case 4: it->setForeground(commentColor); break;
+                        }
+                    }
+                }
+            }
+        } else {
+            QColor mnBg = bgColorForMnemonic(line.mnemonic);
+            bool isBranch = line.mnemonic.startsWith('j') ||
+                            line.mnemonic == "call" || line.mnemonic == "callq";
+            QColor opColor = isBranch ?
+                ConfigColor("DisassemblyAddressOperandColor") : operColor;
+            for (int col = 0; col < 5; col++) {
+                if (auto* it = item(i, col)) {
+                    it->setBackground((col == 2 || col == 3) && mnBg.isValid() ? mnBg : defaultBg);
                     switch (col) {
                     case 0: it->setForeground(addrColor); break;
                     case 1: it->setForeground(bytesColor); break;

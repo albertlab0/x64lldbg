@@ -65,6 +65,11 @@ void Configuration::loadX64dbgDefaultColors()
     m_colors["DisassemblyPushPopColor"]            = QColor("#0000FF");
     m_colors["DisassemblyAddressOperandColor"]     = QColor("#828200");  // yellow/gold for address operands
 
+    // x64dbg-style instruction-type row backgrounds (disassembly columns only)
+    m_colors["DisassemblyCallBgColor"]             = QColor("#00FFFF");  // cyan for call/ret
+    m_colors["DisassemblyRetBgColor"]              = QColor("#00FFFF");  // cyan for ret
+    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#FFFF00");  // yellow for jcc/jmp
+
     m_colors["BreakpointBackgroundColor"]          = QColor("#FF0000");
     m_colors["BreakpointColor"]                    = QColor("#FF0000");
     m_colors["HardwareBreakpointColor"]            = QColor("#FF8000");
@@ -140,6 +145,11 @@ void Configuration::loadModernLightColors()
     m_colors["DisassemblyPushPopColor"]            = QColor("#1D6FB5");
     m_colors["DisassemblyAddressOperandColor"]     = QColor("#9B6700");
 
+    // Instruction-type row backgrounds (disassembly columns only)
+    m_colors["DisassemblyCallBgColor"]             = QColor("#E0F7FA");  // soft cyan
+    m_colors["DisassemblyRetBgColor"]              = QColor("#E0F7FA");  // soft cyan
+    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#FFF9C4");  // soft yellow
+
     m_colors["BreakpointBackgroundColor"]          = QColor("#FFE0E0");
     m_colors["BreakpointColor"]                    = QColor("#E53E3E");
     m_colors["HardwareBreakpointColor"]            = QColor("#F0822D");
@@ -214,6 +224,11 @@ void Configuration::loadCutterDarkColors()
     m_colors["DisassemblyNopColor"]                = QColor("#555d66");
     m_colors["DisassemblyPushPopColor"]            = QColor("#328cff");  // Cutter blue
     m_colors["DisassemblyAddressOperandColor"]     = QColor("#dda368");  // Cutter orange for addresses
+
+    // Instruction-type row backgrounds (disassembly columns only)
+    m_colors["DisassemblyCallBgColor"]             = QColor("#1a3a3c");  // dark cyan tint
+    m_colors["DisassemblyRetBgColor"]              = QColor("#1a3a3c");  // dark cyan tint
+    m_colors["DisassemblyConditionalJumpBgColor"]  = QColor("#3a3520");  // dark yellow tint
 
     // Breakpoints
     m_colors["BreakpointBackgroundColor"]          = QColor("#8c4c4c");
