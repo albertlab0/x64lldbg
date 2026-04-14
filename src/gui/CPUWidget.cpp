@@ -3,6 +3,7 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QHeaderView>
+#include <QTimer>
 
 #include "core/DebugCore.h"
 #include "gui/widgets/CPUDisassembly.h"
@@ -122,6 +123,11 @@ void CPUWidget::setupLayout()
     });
     connect(m_botHSplitter, &QSplitter::splitterMoved, this, [this]() {
         m_topHSplitter->setSizes(m_botHSplitter->sizes());
+    });
+
+    // Force initial sync after the first layout pass computes actual sizes
+    QTimer::singleShot(0, this, [this]() {
+        m_botHSplitter->setSizes(m_topHSplitter->sizes());
     });
 
     // Layout for this widget
