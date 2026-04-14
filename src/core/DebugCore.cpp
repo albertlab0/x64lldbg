@@ -285,7 +285,9 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args, const Q
 
                     if (err.Fail() || funcAddr == 0) continue;
 
-                    lldb::SBAddress sbAddr(funcAddr, m_target);
+                    // Resolve as file address so LLDB applies ASLR slide correctly
+                    lldb::SBAddress sbAddr = module.ResolveFileAddress(funcAddr);
+                    if (!sbAddr.IsValid()) continue;
                     lldb::SBBreakpoint bp = m_target.BreakpointCreateBySBAddress(sbAddr);
                     if (bp.IsValid()) {
                         // Try to get symbol name for logging
