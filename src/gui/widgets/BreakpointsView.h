@@ -13,6 +13,9 @@ public:
 public slots:
     void refresh();
 
+signals:
+    void breakpointDoubleClicked(uint64_t address);
+
 private:
     void setupColumns();
     void applyStyle();

@@ -9,6 +9,16 @@ BreakpointsView::BreakpointsView(DebugCore* debugCore, QWidget* parent)
 {
     setupColumns();
     applyStyle();
+
+    connect(this, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
+        // Address is in column 1, formatted as "0x..."
+        if (auto* addrItem = item(row, 1)) {
+            bool ok;
+            uint64_t addr = addrItem->text().toULongLong(&ok, 16);
+            if (ok)
+                emit breakpointDoubleClicked(addr);
+        }
+    });
 }
 
 void BreakpointsView::setupColumns()

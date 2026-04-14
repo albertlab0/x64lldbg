@@ -315,6 +315,13 @@ void MainWindow::connectSignals()
     // Disassembly selection → InfoBox update
     connect(m_cpuWidget->getDisassembly(), &CPUDisassembly::addressSelected,
             m_cpuWidget->getInfoBox(), &CPUInfoBox::updateInfo);
+
+    // Breakpoint double-click → switch to CPU tab and navigate
+    connect(m_breakpointsView, &BreakpointsView::breakpointDoubleClicked,
+            this, [this](uint64_t address) {
+        m_tabWidget->setCurrentIndex(0);  // Switch to CPU tab
+        m_cpuWidget->getDisassembly()->goToAddress(address);
+    });
 }
 
 void MainWindow::updateStatusLabel(int state)

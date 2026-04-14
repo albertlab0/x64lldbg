@@ -8,6 +8,7 @@
 #include <QAction>
 #include <QPainter>
 #include <QScrollBar>
+#include <QKeyEvent>
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -294,8 +295,10 @@ void CPUDisassembly::rebuildTable()
         mnemItem->setForeground(colorForMnemonic(line.mnemonic));
         setItem(i, 2, mnemItem);
 
-        // Operands — address operands (for call/jmp) use a distinct color
-        auto* operItem = new QTableWidgetItem(line.operands);
+        // Operands — strip 0x prefix (x64dbg defaults to bare hex)
+        QString displayOper = line.operands;
+        displayOper.replace("0x", "", Qt::CaseInsensitive);
+        auto* operItem = new QTableWidgetItem(displayOper);
         bool isBranch = line.mnemonic.startsWith('j') ||
                         line.mnemonic == "call" || line.mnemonic == "callq";
         operItem->setForeground(isBranch ?
@@ -485,6 +488,30 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
         if (col == 2) continue;  // skip separator after Mnemonic
         painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
     }
+}
+
+void CPUDisassembly::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        int row = currentRow();
+        if (row >= 0 && row < m_lines.size()) {
+            const auto& line = m_lines[row];
+            bool isBranch = line.mnemonic.startsWith('j') ||
+                            line.mnemonic == "call" || line.mnemonic == "callq";
+            if (isBranch) {
+                // Parse target address from operands (e.g. "0x401000" or "401000")
+                QString op = line.operands.trimmed();
+                if (op.startsWith("0x", Qt::CaseInsensitive))
+                    op = op.mid(2);
+                bool ok;
+                uint64_t target = op.toULongLong(&ok, 16);
+                if (ok && target != 0)
+                    goToAddress(target);
+            }
+        }
+        return;
+    }
+    QTableWidget::keyPressEvent(event);
 }
 
 uint64_t CPUDisassembly::selectedAddress() const
