@@ -309,10 +309,13 @@ void CPUDisassembly::rebuildTable()
         setItem(i, 4, commentItem);
 
         // x64dbg-style instruction-type background on disassembly columns only
+        // Mnemonic col gets its own bg (cyan for call, yellow for jumps)
+        // Operand col always gets yellow (jump bg) for all branch types
         QColor mnBg = bgColorForMnemonic(line.mnemonic);
         if (mnBg.isValid()) {
             if (auto* it = item(i, 2)) it->setBackground(mnBg);
-            if (auto* it = item(i, 3)) it->setBackground(mnBg);
+            QColor operBg = ConfigColor("DisassemblyConditionalJumpBgColor");
+            if (auto* it = item(i, 3)) it->setBackground(operBg);
         }
 
         // Highlight current IP, breakpoints, goto target
@@ -398,6 +401,7 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
         } else if (isBP) {
             // x64dbg style: address column red, disasm columns keep instruction bg
             QColor mnBg = bgColorForMnemonic(line.mnemonic);
+            QColor operBg = mnBg.isValid() ? ConfigColor("DisassemblyConditionalJumpBgColor") : QColor();
             bool isBranch = line.mnemonic.startsWith('j') ||
                             line.mnemonic == "call" || line.mnemonic == "callq";
             QColor opColor = isBranch ?
@@ -408,7 +412,10 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
                         it->setBackground(bpBg);
                         it->setForeground(cipText); // white on red
                     } else {
-                        it->setBackground((col == 2 || col == 3) && mnBg.isValid() ? mnBg : defaultBg);
+                        QColor bg = defaultBg;
+                        if (col == 2 && mnBg.isValid()) bg = mnBg;
+                        else if (col == 3 && operBg.isValid()) bg = operBg;
+                        it->setBackground(bg);
                         switch (col) {
                         case 1: it->setForeground(bytesColor); break;
                         case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
@@ -420,13 +427,17 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
             }
         } else {
             QColor mnBg = bgColorForMnemonic(line.mnemonic);
+            QColor operBg = mnBg.isValid() ? ConfigColor("DisassemblyConditionalJumpBgColor") : QColor();
             bool isBranch = line.mnemonic.startsWith('j') ||
                             line.mnemonic == "call" || line.mnemonic == "callq";
             QColor opColor = isBranch ?
                 ConfigColor("DisassemblyAddressOperandColor") : operColor;
             for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    it->setBackground((col == 2 || col == 3) && mnBg.isValid() ? mnBg : defaultBg);
+                    QColor bg = defaultBg;
+                    if (col == 2 && mnBg.isValid()) bg = mnBg;
+                    else if (col == 3 && operBg.isValid()) bg = operBg;
+                    it->setBackground(bg);
                     switch (col) {
                     case 0: it->setForeground(addrColor); break;
                     case 1: it->setForeground(bytesColor); break;
