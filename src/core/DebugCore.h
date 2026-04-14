@@ -21,6 +21,7 @@ struct DisassemblyLine {
     QString mnemonic;
     QString operands;
     QString comment;
+    uint64_t branchTarget = 0;  // resolved destination for jmp/jcc/call
 };
 
 struct RegisterInfo {

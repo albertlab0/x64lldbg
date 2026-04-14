@@ -1067,6 +1067,18 @@ QVector<DisassemblyLine> DebugCore::disassemble(uint64_t address, int count)
         line.operands = inst.GetOperands(m_target);
         line.comment = inst.GetComment(m_target);
 
+        // Resolve branch target for jump/call instructions
+        if (line.mnemonic.startsWith('j') ||
+            line.mnemonic == "call" || line.mnemonic == "callq") {
+            QString op = line.operands.trimmed();
+            if (op.startsWith("0x", Qt::CaseInsensitive))
+                op = op.mid(2);
+            bool ok;
+            uint64_t target = op.toULongLong(&ok, 16);
+            if (ok)
+                line.branchTarget = target;
+        }
+
         lines.append(line);
     }
 #else

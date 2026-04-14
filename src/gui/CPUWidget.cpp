@@ -37,6 +37,10 @@ CPUWidget::CPUWidget(DebugCore* debugCore, QWidget* parent)
     connect(m_disassembly, &CPUDisassembly::linesChanged, this, [this]() {
         m_sideBar->setLines(m_disassembly->getLines());
     });
+
+    // Highlight selected instruction's jump arrow in the sidebar
+    connect(m_disassembly, &CPUDisassembly::addressSelected,
+            m_sideBar, &CPUSideBar::setSelectedAddress);
 }
 
 void CPUWidget::setupLayout()

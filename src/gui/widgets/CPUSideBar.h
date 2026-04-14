@@ -16,6 +16,7 @@ public:
     void setRowHeight(int height) { m_rowHeight = height; update(); }
     void setLines(const QVector<DisassemblyLine>& lines) { m_lines = lines; update(); }
     void setTableWidget(QTableWidget* table) { m_table = table; }
+    void setSelectedAddress(uint64_t addr) { m_selectedAddress = addr; update(); }
 
 public slots:
     void refresh();
@@ -24,8 +25,21 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
+    struct JumpLine {
+        int srcRow;
+        int destRow;        // -1 = above viewport, m_lines.size() = below
+        int lane = 0;
+        bool isConditional;
+        bool isSelected;
+    };
+
+    void collectJumps(QVector<JumpLine>& jumps);
+    void allocateLanes(QVector<JumpLine>& jumps);
+    void drawJump(QPainter& painter, const JumpLine& jmp, int headerHeight, int arrowRightX);
+
     DebugCore* m_debugCore;
     QTableWidget* m_table = nullptr;
     int m_rowHeight = 18;
     QVector<DisassemblyLine> m_lines;
+    uint64_t m_selectedAddress = 0;
 };
