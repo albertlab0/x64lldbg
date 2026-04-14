@@ -39,6 +39,8 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
             }
             emit addressSelected(m_lines[row].address);
         }
+        // Repaint viewport so inline flow line updates for new selection
+        viewport()->update();
     });
 }
 
