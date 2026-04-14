@@ -27,9 +27,8 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
                 QColor defaultBg = ConfigColor("DisassemblyBackgroundColor");
                 for (int i = 0; i < m_lines.size(); i++) {
                     if (m_lines[i].address == oldGoto) {
-                        QColor mnemBg = bgColorForMnemonic(m_lines[i].mnemonic);
-                        QColor bg = mnemBg.isValid() ? mnemBg : defaultBg;
-                        for (int col = 0; col < 4; col++) {
+                        QColor bg = defaultBg;
+                        for (int col = 0; col < 5; col++) {
                             if (auto* it = item(i, col))
                                 it->setBackground(bg);
                         }
@@ -44,20 +43,22 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
 
 void CPUDisassembly::setupColumns()
 {
-    setColumnCount(4);  // Address | Bytes | Disassembly | Comments
+    setColumnCount(5);  // Address | Bytes | Mnemonic | Operands | Comments
     horizontalHeader()->setVisible(false);
     horizontalHeader()->setStretchLastSection(true);
     // Interactive resize — user can drag column borders like x64dbg
     horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
     horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
-    horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
-    horizontalHeader()->setMinimumSectionSize(30);
+    horizontalHeader()->setSectionResizeMode(3, QHeaderView::Interactive);
+    horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    horizontalHeader()->setMinimumSectionSize(20);
     // Default column widths
     setColumnWidth(0, 140);  // Address
     setColumnWidth(1, 120);  // Bytes
-    setColumnWidth(2, 300);  // Disassembly (mnemonic + operands)
-    // Column 3 (comments) stretches to fill
+    setColumnWidth(2, 60);   // Mnemonic
+    setColumnWidth(3, 240);  // Operands
+    // Column 4 (comments) stretches to fill
     verticalHeader()->setVisible(false);
     verticalHeader()->setDefaultSectionSize(18);
     setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -288,33 +289,33 @@ void CPUDisassembly::rebuildTable()
         bytesItem->setForeground(bytesColor);
         setItem(i, 1, bytesItem);
 
-        // Disassembly (mnemonic + operands in one column)
-        QString disasmText = line.mnemonic;
-        if (!line.operands.isEmpty())
-            disasmText += " " + line.operands;
-        auto* disasmItem = new QTableWidgetItem(disasmText);
-        disasmItem->setForeground(colorForMnemonic(line.mnemonic));
-        setItem(i, 2, disasmItem);
+        // Mnemonic — colored by instruction type
+        auto* mnemItem = new QTableWidgetItem(line.mnemonic);
+        mnemItem->setForeground(colorForMnemonic(line.mnemonic));
+        setItem(i, 2, mnemItem);
+
+        // Operands — always default operand color
+        auto* operItem = new QTableWidgetItem(line.operands);
+        operItem->setForeground(operColor);
+        setItem(i, 3, operItem);
 
         // Comments
         auto* commentItem = new QTableWidgetItem(
             line.comment.isEmpty() ? QString() : "; " + line.comment);
         commentItem->setForeground(commentColor);
-        setItem(i, 3, commentItem);
+        setItem(i, 4, commentItem);
 
-        // Highlight current IP, breakpoints, goto target, and mnemonic-based row colors
+        // Highlight current IP, breakpoints, goto target
         bool isIP = (line.address == pc);
         bool isBP = bpAddresses.contains(line.address);
         bool isGoto = (line.address == m_gotoAddress && m_gotoAddress != 0);
 
-        QColor rowBg;
         if (isIP) {
-            rowBg = ipBg;
-            // CIP: white text on black background
+            // CIP: white text on dark background for entire row
             QColor cipText = ConfigColor("CurrentIPColor");
-            for (int col = 0; col < 4; col++) {
+            for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    it->setBackground(rowBg);
+                    it->setBackground(ipBg);
                     it->setForeground(cipText);
                 }
             }
@@ -325,22 +326,14 @@ void CPUDisassembly::rebuildTable()
                 it->setForeground(ConfigColor("CurrentIPColor")); // white text on red
             }
         } else if (isGoto) {
-            // User navigation highlight (Ctrl+G) — uses selection color from theme
+            // User navigation highlight (Ctrl+G)
             QColor gotoBg = ConfigColor("DisassemblySelectionColor");
-            for (int col = 0; col < 4; col++) {
+            for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col))
                     it->setBackground(gotoBg);
             }
-        } else {
-            // x64dbg-style: calls/rets/jumps get colored row backgrounds
-            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
-            if (mnemBg.isValid()) {
-                for (int col = 0; col < 4; col++) {
-                    if (auto* it = item(i, col))
-                        it->setBackground(mnemBg);
-                }
-            }
         }
+        // No row background coloring for calls/jumps/rets — only text color differs
 
         // Scroll to goto target or IP row
         if (isGoto) {
@@ -388,7 +381,7 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
         const auto& line = m_lines[i];
 
         if (isIP) {
-            for (int col = 0; col < 4; col++) {
+            for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
                     it->setBackground(ipBg);
                     it->setForeground(cipText);
@@ -396,33 +389,32 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
             }
         } else if (isBP) {
             // x64dbg style: only address column highlighted red
-            for (int col = 0; col < 4; col++) {
+            for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
                     if (col == 0) {
                         it->setBackground(bpBg);
                         it->setForeground(cipText); // white on red
                     } else {
-                        QColor mnemBg = bgColorForMnemonic(line.mnemonic);
-                        it->setBackground(mnemBg.isValid() ? mnemBg : defaultBg);
+                        it->setBackground(defaultBg);
                         switch (col) {
                         case 1: it->setForeground(bytesColor); break;
                         case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
-                        case 3: it->setForeground(commentColor); break;
+                        case 3: it->setForeground(operColor); break;
+                        case 4: it->setForeground(commentColor); break;
                         }
                     }
                 }
             }
         } else {
-            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
-            QColor bg = mnemBg.isValid() ? mnemBg : defaultBg;
-            for (int col = 0; col < 4; col++) {
+            for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    it->setBackground(bg);
+                    it->setBackground(defaultBg);
                     switch (col) {
                     case 0: it->setForeground(addrColor); break;
                     case 1: it->setForeground(bytesColor); break;
                     case 2: it->setForeground(colorForMnemonic(line.mnemonic)); break;
-                    case 3: it->setForeground(commentColor); break;
+                    case 3: it->setForeground(operColor); break;
+                    case 4: it->setForeground(commentColor); break;
                     }
                 }
             }
@@ -457,9 +449,11 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     int viewHeight = viewport()->height();
     int xOffset = -horizontalScrollBar()->value();
 
-    // Draw vertical separators: Address | Bytes | Disassembly | Comments
+    // Draw vertical separators after Address, Bytes, and Operands.
+    // No separator between Mnemonic and Operands (they form "Disassembly").
     for (int col = 0; col < columnCount() - 1; col++) {
         xOffset += columnWidth(col);
+        if (col == 2) continue;  // skip separator after Mnemonic
         painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
     }
 }
