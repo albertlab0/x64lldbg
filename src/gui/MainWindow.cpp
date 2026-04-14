@@ -379,7 +379,7 @@ void MainWindow::applyTheme()
         "QStatusBar { background-color: %6; color: %9; border-top: 1px solid %8; font-size: 12px; padding: 2px 8px; }"
 
         "QTabWidget::pane { border: none; background-color: %1; }"
-        "QTabWidget::tab-bar { left: 0; }"
+        "QTabWidget::tab-bar { left: 0; alignment: left; }"
         "QTabBar { background-color: %6; }"
         "QTabBar::tab { background-color: transparent; color: %9; padding: 8px 16px; border: none;"
         "  border-bottom: 2px solid transparent; font-size: 13px; font-weight: 500; }"

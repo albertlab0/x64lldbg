@@ -206,7 +206,7 @@ CPUDump::CPUDump(DebugCore* debugCore, QWidget* parent)
         "QTabBar::tab:hover:!selected { color: %4; }"
     ).arg(chrome.name(), surface.name(), border.name(), fg.name(), muted.name(), accent.name()));
 
-    layout->addWidget(m_tabBar);
+    layout->addWidget(m_tabBar, 0, Qt::AlignLeft);
     layout->addWidget(stack);
 }
 
