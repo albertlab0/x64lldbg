@@ -112,7 +112,8 @@ public:
     ~DebugCore();
 
     // --- Session management ---
-    bool startDebug(const QString& path, const QStringList& args = {});
+    bool startDebug(const QString& path, const QStringList& args = {}, const QString& arch = {});
+    static QStringList detectArchitectures(const QString& path);
     bool attach(int pid);
     void detach();
     void stop();
@@ -193,6 +194,7 @@ private:
     AsmFlavor m_asmFlavor = Intel;
     QString m_targetPath;
     QStringList m_targetArgs;
+    QString m_targetArch;
 
     // Previous register values for change detection
     QMap<QString, uint64_t> m_prevRegisters;

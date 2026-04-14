@@ -1,6 +1,7 @@
 #include "DebugCore.h"
 #include <QTimer>
 #include <QFile>
+#include <QProcess>
 
 // ============================================================
 // LLDBEventListener — background thread polling LLDB events
@@ -139,10 +140,41 @@ void DebugCore::setAsmFlavor(AsmFlavor flavor)
 
 // --- Session management ---
 
-bool DebugCore::startDebug(const QString& path, const QStringList& args)
+QStringList DebugCore::detectArchitectures(const QString& path)
+{
+    QStringList archs;
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return archs;
+
+    QByteArray header = f.read(8);
+    if (header.size() < 8)
+        return archs;
+
+    // Check for Mach-O fat binary magic (0xCAFEBABE big-endian or 0xBEBAFECA little-endian)
+    uint32_t magic = *reinterpret_cast<const uint32_t*>(header.constData());
+    bool isFat = (magic == 0xCAFEBABE || magic == 0xBEBAFECA);
+    if (!isFat)
+        return archs; // Not a fat binary, single arch — let LLDB auto-detect
+
+#ifdef __APPLE__
+    // Use lipo to list architectures
+    QProcess proc;
+    proc.start("lipo", {"-archs", path});
+    proc.waitForFinished(3000);
+    if (proc.exitCode() == 0) {
+        QString output = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+        archs = output.split(' ', Qt::SkipEmptyParts);
+    }
+#endif
+    return archs;
+}
+
+bool DebugCore::startDebug(const QString& path, const QStringList& args, const QString& arch)
 {
     m_targetPath = path;
     m_targetArgs = args;
+    m_targetArch = arch;
 
 #ifdef HAS_LLDB
     // Clean up previous session
@@ -152,7 +184,12 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args)
     }
 
     lldb::SBError error;
-    m_target = m_debugger.CreateTarget(path.toStdString().c_str());
+    if (!arch.isEmpty()) {
+        m_target = m_debugger.CreateTargetWithFileAndArch(
+            path.toStdString().c_str(), arch.toStdString().c_str());
+    } else {
+        m_target = m_debugger.CreateTarget(path.toStdString().c_str());
+    }
     if (!m_target.IsValid()) {
         emit outputReceived("Failed to create target: " + path);
         return false;
@@ -289,9 +326,10 @@ void DebugCore::restart()
 {
     QString path = m_targetPath;
     QStringList args = m_targetArgs;
+    QString arch = m_targetArch;
     stop();
     if (!path.isEmpty()) {
-        startDebug(path, args);
+        startDebug(path, args, arch);
     }
 }
 

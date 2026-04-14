@@ -9,6 +9,7 @@
 #include <QTabWidget>
 #include <QAction>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QIcon>
 #include <QStyle>
@@ -56,8 +57,18 @@ void MainWindow::createMenuBar()
     auto* fileMenu = menuBar()->addMenu("&File");
     fileMenu->addAction("&Open...", this, [this]() {
         QString path = QFileDialog::getOpenFileName(this, "Open Executable");
-        if (!path.isEmpty())
-            m_debugCore->startDebug(path);
+        if (path.isEmpty()) return;
+
+        QString arch;
+        QStringList archs = DebugCore::detectArchitectures(path);
+        if (archs.size() > 1) {
+            bool ok = false;
+            arch = QInputDialog::getItem(this, "Select Architecture",
+                "This is a universal binary.\nChoose architecture to debug:",
+                archs, 0, false, &ok);
+            if (!ok) return;
+        }
+        m_debugCore->startDebug(path, {}, arch);
     });
     fileMenu->addAction("&Attach to Process...", this, [this]() {
         // TODO: attach dialog
