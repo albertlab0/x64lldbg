@@ -21,6 +21,9 @@ signals:
     void addressSelected(uint64_t address);
     void linesChanged();
 
+protected:
+    void paintEvent(QPaintEvent* event) override;
+
 private:
     void setupColumns();
     void applyStyle();

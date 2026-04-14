@@ -6,6 +6,8 @@
 #include <QSet>
 #include <QMenu>
 #include <QAction>
+#include <QPainter>
+#include <QScrollBar>
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -45,9 +47,17 @@ void CPUDisassembly::setupColumns()
     setColumnCount(4);
     horizontalHeader()->setVisible(false);
     horizontalHeader()->setStretchLastSection(true);
-    horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    // Interactive resize — user can drag column borders like x64dbg
+    horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
+    horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
+    horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
+    horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+    horizontalHeader()->setMinimumSectionSize(30);
+    // Default column widths
+    setColumnWidth(0, 140);  // Address
+    setColumnWidth(1, 120);  // Bytes
+    setColumnWidth(2, 80);   // Mnemonic
+    // Column 3 (operands) stretches to fill
     verticalHeader()->setVisible(false);
     verticalHeader()->setDefaultSectionSize(18);
     setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -429,6 +439,26 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
 
     // Emit addressSelected for the InfoBox
     emit addressSelected(pc);
+}
+
+void CPUDisassembly::paintEvent(QPaintEvent* event)
+{
+    // Let QTableWidget paint everything first
+    QTableWidget::paintEvent(event);
+
+    // Draw vertical separator lines between columns (x64dbg style)
+    QPainter painter(viewport());
+    QColor sepColor = ConfigColor("TableGridColor");
+    painter.setPen(QPen(sepColor, 1));
+
+    int viewHeight = viewport()->height();
+    int xOffset = -horizontalScrollBar()->value();
+
+    // Draw a vertical line at the right edge of each column except the last
+    for (int col = 0; col < columnCount() - 1; col++) {
+        xOffset += columnWidth(col);
+        painter.drawLine(xOffset - 1, 0, xOffset - 1, viewHeight);
+    }
 }
 
 uint64_t CPUDisassembly::selectedAddress() const
