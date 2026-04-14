@@ -199,8 +199,48 @@ bool DebugCore::startDebug(const QString& path, const QStringList& args, const Q
 
     // Set a breakpoint at main (like x64dbg's "system breakpoint" + entry)
     lldb::SBBreakpoint mainBp = m_target.BreakpointCreateByName("main");
-    if (mainBp.IsValid()) {
+    if (mainBp.IsValid() && mainBp.GetNumLocations() > 0) {
         emit outputReceived(QString("Breakpoint set at main (id=%1)").arg(mainBp.GetID()));
+    } else {
+        // No main symbol — try to set breakpoint at the binary's entry point
+        if (mainBp.IsValid())
+            m_target.BreakpointDelete(mainBp.GetID());
+
+        // Get entry point address from the module's object file header
+        lldb::SBModule module = m_target.GetModuleAtIndex(0);
+        if (module.IsValid()) {
+            // Look for common entry symbols
+            const char* entryNames[] = {"_start", "start", "_main", "entry", nullptr};
+            bool found = false;
+            for (const char** name = entryNames; *name; ++name) {
+                lldb::SBBreakpoint bp = m_target.BreakpointCreateByName(*name);
+                if (bp.IsValid() && bp.GetNumLocations() > 0) {
+                    emit outputReceived(QString("Breakpoint set at %1 (id=%2)")
+                        .arg(*name).arg(bp.GetID()));
+                    found = true;
+                    break;
+                } else if (bp.IsValid()) {
+                    m_target.BreakpointDelete(bp.GetID());
+                }
+            }
+
+            if (!found) {
+                // Last resort: get entry point from object file header
+                lldb::SBAddress entryAddr = module.GetObjectFileEntryPointAddress();
+                if (entryAddr.IsValid()) {
+                    lldb::SBBreakpoint entryBp = m_target.BreakpointCreateBySBAddress(entryAddr);
+                    if (entryBp.IsValid()) {
+                        uint64_t addr = entryAddr.GetLoadAddress(m_target);
+                        if (addr == UINT64_MAX)
+                            addr = entryAddr.GetFileAddress();
+                        emit outputReceived(QString("Breakpoint set at entry point 0x%1 (id=%2)")
+                            .arg(addr, 0, 16).arg(entryBp.GetID()));
+                    }
+                } else {
+                    emit outputReceived("Warning: no main or entry point found");
+                }
+            }
+        }
     }
 
     // Convert args
