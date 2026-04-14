@@ -543,88 +543,56 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
         return;
 
     // Find destination row
-    int destRow = -1;  // -1 = above viewport
-    bool destFound = false;
+    int destRow = -1;
     for (int j = 0; j < m_lines.size(); j++) {
         if (m_lines[j].address == selLine.branchTarget) {
             destRow = j;
-            destFound = true;
             break;
         }
     }
-    if (!destFound) {
-        if (selLine.branchTarget > m_lines.last().address)
-            destRow = m_lines.size();  // below viewport
+
+    // Compute source and destination Y directly
+    int srcY = rowViewportPosition(selRow) + rowHeight / 2;
+    int destY;
+    bool destOnScreen;
+
+    if (destRow >= 0) {
+        // Destination found within loaded lines
+        destY = rowViewportPosition(destRow) + rowHeight / 2;
+        destOnScreen = (destY >= 0 && destY <= viewHeight);
+    } else if (selLine.branchTarget < selLine.address) {
+        // Target is above — line goes to top of viewport
+        destY = 0;
+        destOnScreen = false;
+    } else {
+        // Target is below — line goes to bottom of viewport
+        destY = viewHeight;
+        destOnScreen = false;
     }
 
-    int minRow = qMin(selRow, destRow);
-    int maxRow = qMax(selRow, destRow);
-
-    QPen flowPen(arrowColor, 1.5);
+    // Red color for selected jump flow line
+    QColor flowColor = ConfigColor("SideBarJumpSelectedColor");
+    QPen flowPen(flowColor, 1.5);
     painter.setPen(flowPen);
     painter.setBrush(Qt::NoBrush);
 
-    for (int i = 0; i < m_lines.size(); i++) {
-        int rowTop = rowViewportPosition(i);
-        if (rowTop < -rowHeight || rowTop > viewHeight)
-            continue;
+    // Source: horizontal connector
+    painter.drawLine(lineX, srcY, lineX + 5, srcY);
 
-        int cy = rowTop + rowHeight / 2;
+    // Vertical line from source to destination
+    painter.drawLine(lineX, srcY, lineX, destY);
 
-        if (i < minRow || i > maxRow)
-            continue;  // not part of this jump's path
+    // Destination: horizontal connector + arrowhead (only if on-screen)
+    if (destOnScreen && destRow >= 0) {
+        painter.drawLine(lineX, destY, lineX + 5, destY);
 
-        bool isSrc  = (i == selRow);
-        bool isDest = (i == destRow);
-        bool isMid  = (!isSrc && !isDest);
-
-        if (isSrc && isDest) {
-            // Self-loop (shouldn't happen for jumps but handle it)
-            continue;
-        }
-
-        if (isMid) {
-            // Vertical line through entire row
-            painter.drawLine(lineX, rowTop, lineX, rowTop + rowHeight);
-        } else if (isSrc) {
-            // Foot: horizontal connector + vertical toward destination
-            painter.drawLine(lineX, cy, lineX + 5, cy);
-            if (destRow < selRow)
-                painter.drawLine(lineX, rowTop, lineX, cy);
-            else
-                painter.drawLine(lineX, cy, lineX, rowTop + rowHeight);
-        } else if (isDest) {
-            // Head: horizontal connector + arrowhead + vertical from source
-            painter.drawLine(lineX, cy, lineX + 5, cy);
-
-            // Arrowhead pointing right
-            QPoint pts[3] = {
-                QPoint(lineX + 3, cy - 2),
-                QPoint(lineX + 5, cy),
-                QPoint(lineX + 3, cy + 2),
-            };
-            painter.drawPolyline(pts, 3);
-
-            if (selRow < destRow)
-                painter.drawLine(lineX, rowTop, lineX, cy);
-            else
-                painter.drawLine(lineX, cy, lineX, rowTop + rowHeight);
-        }
-    }
-
-    // Handle off-screen destination: draw vertical to viewport edge
-    if (destRow < 0) {
-        // Destination above viewport — vertical from source to top
-        int srcTop = rowViewportPosition(selRow);
-        int srcCy = srcTop + rowHeight / 2;
-        painter.drawLine(lineX, 0, lineX, srcCy);
-        painter.drawLine(lineX, srcCy, lineX + 5, srcCy);
-    } else if (destRow >= m_lines.size()) {
-        // Destination below viewport — vertical from source to bottom
-        int srcTop = rowViewportPosition(selRow);
-        int srcCy = srcTop + rowHeight / 2;
-        painter.drawLine(lineX, srcCy, lineX, viewHeight);
-        painter.drawLine(lineX, srcCy, lineX + 5, srcCy);
+        // Arrowhead pointing right
+        QPoint pts[3] = {
+            QPoint(lineX + 3, destY - 2),
+            QPoint(lineX + 5, destY),
+            QPoint(lineX + 3, destY + 2),
+        };
+        painter.drawPolyline(pts, 3);
     }
 }
 
