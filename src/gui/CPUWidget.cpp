@@ -101,8 +101,8 @@ void CPUWidget::setupLayout()
     m_botHSplitter->setHandleWidth(1);
     m_botHSplitter->addWidget(m_dump);
     m_botHSplitter->addWidget(m_stack);
-    m_botHSplitter->setStretchFactor(0, 60);
-    m_botHSplitter->setStretchFactor(1, 40);
+    m_botHSplitter->setStretchFactor(0, 77);
+    m_botHSplitter->setStretchFactor(1, 23);
     m_botHSplitter->setCollapsible(0, false);
     m_botHSplitter->setCollapsible(1, false);
 
@@ -115,6 +115,14 @@ void CPUWidget::setupLayout()
     m_vSplitter->setStretchFactor(1, 40);
     m_vSplitter->setCollapsible(0, false);
     m_vSplitter->setCollapsible(1, false);
+
+    // Sync top and bottom horizontal splitters so registers/stack widths align
+    connect(m_topHSplitter, &QSplitter::splitterMoved, this, [this]() {
+        m_botHSplitter->setSizes(m_topHSplitter->sizes());
+    });
+    connect(m_botHSplitter, &QSplitter::splitterMoved, this, [this]() {
+        m_topHSplitter->setSizes(m_botHSplitter->sizes());
+    });
 
     // Layout for this widget
     auto* layout = new QVBoxLayout(this);

@@ -24,7 +24,7 @@ void CPUStack::setupColumns()
     setEditTriggers(QAbstractItemView::NoEditTriggers);
     setSelectionBehavior(QAbstractItemView::SelectRows);
     setShowGrid(false);
-    setAlternatingRowColors(true);
+    setAlternatingRowColors(false);
 }
 
 void CPUStack::applyStyle()
