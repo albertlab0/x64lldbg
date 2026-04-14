@@ -333,7 +333,17 @@ void CPUDisassembly::rebuildTable()
                     it->setBackground(gotoBg);
             }
         }
-        // No row background coloring for calls/jumps/rets — only text color differs
+        // x64dbg-style: calls/jumps/rets get colored background only in
+        // the disassembly area (mnemonic + operands), not address/bytes
+        if (!isIP && !isBP && !isGoto) {
+            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
+            if (mnemBg.isValid()) {
+                for (int col = 2; col <= 3; col++) {
+                    if (auto* it = item(i, col))
+                        it->setBackground(mnemBg);
+                }
+            }
+        }
 
         // Scroll to goto target or IP row
         if (isGoto) {
@@ -406,9 +416,12 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
                 }
             }
         } else {
+            QColor mnemBg = bgColorForMnemonic(line.mnemonic);
             for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
-                    it->setBackground(defaultBg);
+                    // Disassembly columns (2,3) get mnemonic bg if applicable
+                    bool isDisasmCol = (col == 2 || col == 3);
+                    it->setBackground((isDisasmCol && mnemBg.isValid()) ? mnemBg : defaultBg);
                     switch (col) {
                     case 0: it->setForeground(addrColor); break;
                     case 1: it->setForeground(bytesColor); break;
