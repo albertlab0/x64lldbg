@@ -65,6 +65,8 @@ void CPUDisassembly::setupColumns()
     setEditTriggers(QAbstractItemView::NoEditTriggers);
     setShowGrid(false);
     setAlternatingRowColors(false);
+    setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 }
 
 void CPUDisassembly::applyStyle()
