@@ -4,6 +4,7 @@
 #include <QVBoxLayout>
 #include <QHeaderView>
 #include <QTimer>
+#include <QScrollBar>
 
 #include "core/DebugCore.h"
 #include "gui/widgets/CPUDisassembly.h"
@@ -32,6 +33,10 @@ CPUWidget::CPUWidget(DebugCore* debugCore, QWidget* parent)
     // Sync sidebar with disassembly table
     m_sideBar->setRowHeight(m_disassembly->verticalHeader()->defaultSectionSize());
     m_sideBar->setTableWidget(m_disassembly);
+
+    // Repaint sidebar when disassembly scrolls (keeps jump arrows aligned)
+    connect(m_disassembly->verticalScrollBar(), &QScrollBar::valueChanged,
+            m_sideBar, QOverload<>::of(&QWidget::update));
 
     // Feed disassembly lines to sidebar so it shows correct IP/breakpoint markers
     connect(m_disassembly, &CPUDisassembly::linesChanged, this, [this]() {
