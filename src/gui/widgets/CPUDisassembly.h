@@ -25,6 +25,9 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void scrollContentsBy(int dx, int dy) override;
 
 private:
@@ -38,9 +41,15 @@ private:
     void promptSetLabel();
     QColor colorForMnemonic(const QString& mnemonic) const;
     QColor bgColorForMnemonic(const QString& mnemonic) const;
+    int columnBoundaryAt(int x) const;  // returns col index if x is near a boundary, else -1
 
     DebugCore* m_debugCore;
     uint64_t m_baseAddress = 0;
     uint64_t m_gotoAddress = 0;  // user navigation highlight (Ctrl+G)
     QVector<DisassemblyLine> m_lines;
+
+    // Column resize dragging (x64dbg-style, no visible header)
+    int m_resizeCol = -1;       // column being resized (-1 = none)
+    int m_resizeDragStartX = 0; // mouse X at drag start
+    int m_resizeOrigWidth = 0;  // column width at drag start
 };

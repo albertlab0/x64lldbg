@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QInputDialog>
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
@@ -50,14 +51,10 @@ void CPUDisassembly::setupColumns()
 {
     setColumnCount(5);  // Address | Bytes | Mnemonic | Operands | Comments
 
-    // Show header with column labels — also gives draggable resize handles
-    horizontalHeader()->setVisible(true);
-    horizontalHeader()->setHighlightSections(false);
-    horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    // No visible header — column resize is handled via custom mouse events
+    // on the viewport (x64dbg-style: drag the vertical separator lines)
+    horizontalHeader()->setVisible(false);
     horizontalHeader()->setStretchLastSection(true);
-    setHorizontalHeaderLabels({"Address", "Bytes", "Opcode", "Operands", "Comment"});
-
-    // Interactive resize — user can drag column borders like x64dbg
     horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
     horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
@@ -79,6 +76,7 @@ void CPUDisassembly::setupColumns()
     setAlternatingRowColors(false);
     setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    setMouseTracking(true);  // needed for resize cursor on hover
 }
 
 void CPUDisassembly::applyStyle()
@@ -90,20 +88,12 @@ void CPUDisassembly::applyStyle()
     QColor fg = ConfigColor("DisassemblyTextColor");
     QColor sel = ConfigColor("DisassemblySelectionColor");
     QColor grid = ConfigColor("TableGridColor");
-    QColor hdrBg = ConfigColor("TableHeaderBackgroundColor");
-    QColor hdrFg = ConfigColor("TableHeaderTextColor");
-
-    QColor border = ConfigColor("ChromeBorderColor");
 
     setStyleSheet(QString(
         "QTableWidget { background-color: %1; color: %2; border: none; outline: none; }"
         "QTableWidget::item { padding: 0 4px; }"
         "QTableWidget::item:selected { background-color: %4; }"
-        "QHeaderView::section { background-color: %5; color: %6; border: none;"
-        "  border-right: 1px solid %7; border-bottom: 1px solid %7;"
-        "  padding: 2px 4px; font-size: 12px; font-weight: 500; }"
-    ).arg(bg.name(), fg.name(), grid.name(), sel.name(),
-          hdrBg.name(), hdrFg.name(), border.name()));
+    ).arg(bg.name(), fg.name(), grid.name(), sel.name()));
 }
 
 void CPUDisassembly::setupContextMenu()
@@ -344,9 +334,15 @@ void CPUDisassembly::rebuildTable()
             ConfigColor("DisassemblyAddressOperandColor") : operColor);
         setItem(i, 3, operItem);
 
-        // Comments
-        auto* commentItem = new QTableWidgetItem(
-            line.comment.isEmpty() ? QString() : "; " + line.comment);
+        // Comments — also show label if address has one
+        QString commentText;
+        if (!addrLabel.isEmpty())
+            commentText = "<" + addrLabel + ">";
+        if (!line.comment.isEmpty()) {
+            if (!commentText.isEmpty()) commentText += " ";
+            commentText += "; " + line.comment;
+        }
+        auto* commentItem = new QTableWidgetItem(commentText);
         commentItem->setForeground(commentColor);
         setItem(i, 4, commentItem);
 
@@ -673,6 +669,72 @@ void CPUDisassembly::wheelEvent(QWheelEvent* event)
     if (!hasFocus())
         setFocus(Qt::MouseFocusReason);
     QTableWidget::wheelEvent(event);
+}
+
+// ── Column resize via separator dragging (x64dbg-style) ──
+
+static constexpr int RESIZE_GRIP = 4;  // pixels from column edge to trigger resize
+
+int CPUDisassembly::columnBoundaryAt(int x) const
+{
+    int hScroll = horizontalScrollBar()->value();
+    int edge = -hScroll;
+    // Check columns 0..3 (not the last stretch column)
+    for (int col = 0; col < columnCount() - 1; col++) {
+        edge += columnWidth(col);
+        if (qAbs(x - edge) <= RESIZE_GRIP)
+            return col;
+    }
+    return -1;
+}
+
+void CPUDisassembly::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        int col = columnBoundaryAt(event->pos().x());
+        if (col >= 0) {
+            m_resizeCol = col;
+            m_resizeDragStartX = event->pos().x();
+            m_resizeOrigWidth = columnWidth(col);
+            event->accept();
+            return;
+        }
+    }
+    QTableWidget::mousePressEvent(event);
+}
+
+void CPUDisassembly::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_resizeCol >= 0) {
+        // Dragging a column boundary
+        int delta = event->pos().x() - m_resizeDragStartX;
+        int newWidth = qMax(horizontalHeader()->minimumSectionSize(),
+                            m_resizeOrigWidth + delta);
+        setColumnWidth(m_resizeCol, newWidth);
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
+    // Update cursor when hovering near a column boundary
+    int col = columnBoundaryAt(event->pos().x());
+    if (col >= 0)
+        viewport()->setCursor(Qt::SplitHCursor);
+    else
+        viewport()->unsetCursor();
+
+    QTableWidget::mouseMoveEvent(event);
+}
+
+void CPUDisassembly::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (m_resizeCol >= 0) {
+        m_resizeCol = -1;
+        viewport()->unsetCursor();
+        event->accept();
+        return;
+    }
+    QTableWidget::mouseReleaseEvent(event);
 }
 
 void CPUDisassembly::scrollContentsBy(int dx, int dy)
