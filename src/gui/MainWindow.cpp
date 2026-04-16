@@ -328,6 +328,17 @@ void MainWindow::connectSignals()
         }
     });
 
+    // Ctrl+G — Go to Address (window-level so it works regardless of focus)
+    auto* gotoAction = new QAction(this);
+    gotoAction->setShortcut(Config()->getShortcut("GotoAddress").hotkey);
+    connect(gotoAction, &QAction::triggered, this, [this]() {
+        m_tabWidget->setCurrentIndex(0);  // Switch to CPU tab
+        GotoDialog dlg(m_debugCore, this);
+        if (dlg.exec() == QDialog::Accepted)
+            m_cpuWidget->getDisassembly()->goToAddress(dlg.resultAddress());
+    });
+    addAction(gotoAction);
+
     // Breakpoint double-click → switch to CPU tab and navigate
     connect(m_breakpointsView, &BreakpointsView::breakpointDoubleClicked,
             this, [this](uint64_t address) {

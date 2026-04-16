@@ -294,34 +294,42 @@ void Configuration::loadCutterDarkColors()
 }
 
 // ----- Shortcuts (x64dbg defaults) -----
+// On macOS Qt maps Qt::CTRL to ⌘ (Command). We want the physical Ctrl key
+// for x64dbg-compatible shortcuts, which is Qt::META on macOS.
+#ifdef Q_OS_MACOS
+static constexpr auto PHYS_CTRL = Qt::META;
+#else
+static constexpr auto PHYS_CTRL = Qt::CTRL;
+#endif
+
 void Configuration::loadDefaultShortcuts()
 {
     m_shortcuts["DebugRun"]              = {"Run",                   QKeySequence(Qt::Key_F9)};
     m_shortcuts["DebugStepInto"]         = {"Step Into",             QKeySequence(Qt::Key_F7)};
     m_shortcuts["DebugStepOver"]         = {"Step Over",             QKeySequence(Qt::Key_F8)};
-    m_shortcuts["DebugStepOut"]          = {"Step Out",              QKeySequence(Qt::CTRL | Qt::Key_F9)};
+    m_shortcuts["DebugStepOut"]          = {"Step Out",              QKeySequence(PHYS_CTRL | Qt::Key_F9)};
     m_shortcuts["DebugRunToCursor"]      = {"Run to Cursor",         QKeySequence(Qt::Key_F4)};
     m_shortcuts["DebugRunToExpression"]  = {"Run to Expression",     QKeySequence(Qt::SHIFT | Qt::Key_F4)};
     m_shortcuts["DebugPause"]            = {"Pause",                 QKeySequence(Qt::Key_F12)};
-    m_shortcuts["DebugRestart"]          = {"Restart",               QKeySequence(Qt::CTRL | Qt::Key_F2)};
+    m_shortcuts["DebugRestart"]          = {"Restart",               QKeySequence(PHYS_CTRL | Qt::Key_F2)};
     m_shortcuts["DebugClose"]            = {"Stop",                  QKeySequence(Qt::ALT | Qt::Key_F2)};
 
     m_shortcuts["ToggleBreakpoint"]      = {"Toggle Breakpoint",     QKeySequence(Qt::Key_F2)};
     m_shortcuts["EditBreakpoint"]        = {"Conditional Breakpoint", QKeySequence(Qt::SHIFT | Qt::Key_F2)};
 
-    m_shortcuts["DebugAnimateInto"]      = {"Animate Into",          QKeySequence(Qt::CTRL | Qt::Key_F7)};
-    m_shortcuts["DebugAnimateOver"]      = {"Animate Over",          QKeySequence(Qt::CTRL | Qt::Key_F8)};
-    m_shortcuts["DebugTraceInto"]        = {"Trace Into",            QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F7)};
-    m_shortcuts["DebugTraceOver"]        = {"Trace Over",            QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_F8)};
+    m_shortcuts["DebugAnimateInto"]      = {"Animate Into",          QKeySequence(PHYS_CTRL | Qt::Key_F7)};
+    m_shortcuts["DebugAnimateOver"]      = {"Animate Over",          QKeySequence(PHYS_CTRL | Qt::Key_F8)};
+    m_shortcuts["DebugTraceInto"]        = {"Trace Into",            QKeySequence(PHYS_CTRL | Qt::ALT | Qt::Key_F7)};
+    m_shortcuts["DebugTraceOver"]        = {"Trace Over",            QKeySequence(PHYS_CTRL | Qt::ALT | Qt::Key_F8)};
     m_shortcuts["DebugRunToUserCode"]    = {"Run to User Code",      QKeySequence(Qt::ALT | Qt::Key_F9)};
 
     m_shortcuts["GotoOrigin"]            = {"Go to Origin",          QKeySequence(Qt::Key_Asterisk)};
-    m_shortcuts["GotoAddress"]           = {"Go to Address",         QKeySequence(Qt::CTRL | Qt::Key_G)};
-    m_shortcuts["SetIPHere"]             = {"Set IP Here",           QKeySequence(Qt::CTRL | Qt::Key_Asterisk)};
+    m_shortcuts["GotoAddress"]           = {"Go to Address",         QKeySequence(PHYS_CTRL | Qt::Key_G)};
+    m_shortcuts["SetIPHere"]             = {"Set IP Here",           QKeySequence(PHYS_CTRL | Qt::Key_Asterisk)};
 
     m_shortcuts["SetComment"]            = {"Set Comment",           QKeySequence(Qt::Key_Semicolon)};
     m_shortcuts["SetLabel"]              = {"Set Label",             QKeySequence(Qt::Key_Colon)};
-    m_shortcuts["ToggleBookmark"]        = {"Toggle Bookmark",       QKeySequence(Qt::CTRL | Qt::Key_D)};
+    m_shortcuts["ToggleBookmark"]        = {"Toggle Bookmark",       QKeySequence(PHYS_CTRL | Qt::Key_D)};
 }
 
 // ----- Fonts -----

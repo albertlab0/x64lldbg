@@ -18,6 +18,7 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     setupColumns();
     applyStyle();
     setupContextMenu();
+    setFocusPolicy(Qt::WheelFocus);
 
     connect(this, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
         if (row >= 0 && row < m_lines.size()) {
@@ -48,8 +49,14 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
 void CPUDisassembly::setupColumns()
 {
     setColumnCount(5);  // Address | Bytes | Mnemonic | Operands | Comments
-    horizontalHeader()->setVisible(false);
+
+    // Show header with column labels — also gives draggable resize handles
+    horizontalHeader()->setVisible(true);
+    horizontalHeader()->setHighlightSections(false);
+    horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     horizontalHeader()->setStretchLastSection(true);
+    setHorizontalHeaderLabels({"Address", "Bytes", "Opcode", "Operands", "Comment"});
+
     // Interactive resize — user can drag column borders like x64dbg
     horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
@@ -58,7 +65,7 @@ void CPUDisassembly::setupColumns()
     horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
     horizontalHeader()->setMinimumSectionSize(20);
     // Default column widths
-    setColumnWidth(0, 140);  // Address
+    setColumnWidth(0, 200);  // Address (wider for labels)
     setColumnWidth(1, 120);  // Bytes
     setColumnWidth(2, 60);   // Mnemonic
     setColumnWidth(3, 240);  // Operands
@@ -86,11 +93,17 @@ void CPUDisassembly::applyStyle()
     QColor hdrBg = ConfigColor("TableHeaderBackgroundColor");
     QColor hdrFg = ConfigColor("TableHeaderTextColor");
 
+    QColor border = ConfigColor("ChromeBorderColor");
+
     setStyleSheet(QString(
         "QTableWidget { background-color: %1; color: %2; border: none; outline: none; }"
         "QTableWidget::item { padding: 0 4px; }"
         "QTableWidget::item:selected { background-color: %4; }"
-    ).arg(bg.name(), fg.name(), grid.name(), sel.name()));
+        "QHeaderView::section { background-color: %5; color: %6; border: none;"
+        "  border-right: 1px solid %7; border-bottom: 1px solid %7;"
+        "  padding: 2px 4px; font-size: 12px; font-weight: 500; }"
+    ).arg(bg.name(), fg.name(), grid.name(), sel.name(),
+          hdrBg.name(), hdrFg.name(), border.name()));
 }
 
 void CPUDisassembly::setupContextMenu()
@@ -149,12 +162,7 @@ void CPUDisassembly::setupContextMenu()
         addAction(action);
     };
 
-    // Ctrl+G — Go to Address
-    addLocalAction("GotoAddress", [this]() {
-        GotoDialog dlg(m_debugCore, this);
-        if (dlg.exec() == QDialog::Accepted)
-            goToAddress(dlg.resultAddress());
-    });
+    // Ctrl+G is handled at MainWindow level so it works regardless of focus
 
     // * — Go to Origin (current RIP)
     addLocalAction("GotoOrigin", [this]() {
@@ -657,6 +665,14 @@ uint64_t CPUDisassembly::selectedAddress() const
     if (row >= 0 && row < m_lines.size())
         return m_lines[row].address;
     return 0;
+}
+
+void CPUDisassembly::wheelEvent(QWheelEvent* event)
+{
+    // Grab focus on wheel so scrolling works without clicking first
+    if (!hasFocus())
+        setFocus(Qt::MouseFocusReason);
+    QTableWidget::wheelEvent(event);
 }
 
 void CPUDisassembly::scrollContentsBy(int dx, int dy)

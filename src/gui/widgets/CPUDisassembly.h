@@ -24,6 +24,7 @@ signals:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
     void scrollContentsBy(int dx, int dy) override;
 
 private:
