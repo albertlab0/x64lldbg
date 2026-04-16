@@ -34,18 +34,15 @@ void CPUStack::applyStyle()
 
     QColor bg = ConfigColor("StackBackgroundColor");
     QColor fg = ConfigColor("StackTextColor");
-    QColor grid = ConfigColor("TableGridColor");
     QColor sel = ConfigColor("DisassemblySelectionColor");
     QColor alt = ConfigColor("AlternateRowColor");
-    QColor hdrBg = ConfigColor("TableHeaderBackgroundColor");
-    QColor hdrFg = ConfigColor("TableHeaderTextColor");
 
     setStyleSheet(QString(
         "QTableWidget { background-color: %1; color: %2; border: none; outline: none; }"
         "QTableWidget::item { padding: 0 4px; }"
-        "QTableWidget::item:selected { background-color: %4; }"
-        "QTableWidget::item:alternate { background-color: %5; }"
-    ).arg(bg.name(), fg.name(), grid.name(), sel.name(), alt.name()));
+        "QTableWidget::item:selected { background-color: %3; }"
+        "QTableWidget::item:alternate { background-color: %4; }"
+    ).arg(bg.name(), fg.name(), sel.name(), alt.name()));
 }
 
 void CPUStack::refresh()

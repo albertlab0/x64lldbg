@@ -208,18 +208,17 @@ CPUDump::CPUDump(DebugCore* debugCore, QWidget* parent)
     // Style the tab bar to match theme
     QColor chrome = ConfigColor("ChromeBackgroundColor");
     QColor surface = ConfigColor("ChromeSurfaceColor");
-    QColor border = ConfigColor("ChromeBorderColor");
     QColor fg = ConfigColor("HexDumpTextColor");
     QColor muted = ConfigColor("ChromeMutedTextColor");
     QColor accent = ConfigColor("ChromeAccentColor");
 
     m_tabBar->setStyleSheet(QString(
         "QTabBar { background: %1; }"
-        "QTabBar::tab { background: %1; color: %5; padding: 4px 16px; min-width: 50px;"
+        "QTabBar::tab { background: %1; color: %4; padding: 4px 16px; min-width: 50px;"
         "  border: none; border-bottom: 2px solid transparent; font-size: 12px; }"
-        "QTabBar::tab:selected { color: %4; border-bottom: 2px solid %6; background: %2; }"
-        "QTabBar::tab:hover:!selected { color: %4; }"
-    ).arg(chrome.name(), surface.name(), border.name(), fg.name(), muted.name(), accent.name()));
+        "QTabBar::tab:selected { color: %3; border-bottom: 2px solid %5; background: %2; }"
+        "QTabBar::tab:hover:!selected { color: %3; }"
+    ).arg(chrome.name(), surface.name(), fg.name(), muted.name(), accent.name()));
 
     layout->addWidget(m_tabBar, 0, Qt::AlignLeft);
     layout->addWidget(stack);

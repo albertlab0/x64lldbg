@@ -34,16 +34,13 @@ void CPURegistersView::applyStyle()
 
     QColor bg = ConfigColor("RegistersBackgroundColor");
     QColor fg = ConfigColor("RegistersTextColor");
-    QColor grid = ConfigColor("TableGridColor");
     QColor sel = ConfigColor("DisassemblySelectionColor");
-    QColor hdrBg = ConfigColor("TableHeaderBackgroundColor");
-    QColor hdrFg = ConfigColor("TableHeaderTextColor");
 
     setStyleSheet(QString(
         "QTableWidget { background-color: %1; color: %2; border: none; outline: none; }"
         "QTableWidget::item { padding: 0 4px; }"
-        "QTableWidget::item:selected { background-color: %4; }"
-    ).arg(bg.name(), fg.name(), grid.name(), sel.name()));
+        "QTableWidget::item:selected { background-color: %3; }"
+    ).arg(bg.name(), fg.name(), sel.name()));
 }
 
 void CPURegistersView::refresh()

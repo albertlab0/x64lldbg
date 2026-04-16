@@ -1,5 +1,6 @@
 #include "Configuration.h"
 #include <QFontInfo>
+#include <QFontDatabase>
 
 Configuration* Configuration::s_instance = nullptr;
 
@@ -336,18 +337,22 @@ void Configuration::loadDefaultShortcuts()
 void Configuration::loadDefaultFonts()
 {
 #ifdef Q_OS_MACOS
-    QFont mono("SF Mono", 12);
-    if (!QFontInfo(mono).fixedPitch())
+    // Use hasFamily() to avoid expensive font alias population for missing fonts
+    QFont mono;
+    if (QFontDatabase::families().contains("SF Mono"))
+        mono = QFont("SF Mono", 12);
+    else
         mono = QFont("Menlo", 12);
 #else
-    QFont mono("JetBrains Mono", 10);
-    if (!QFontInfo(mono).fixedPitch()) {
+    QFont mono;
+    if (QFontDatabase::families().contains("JetBrains Mono"))
+        mono = QFont("JetBrains Mono", 10);
+    else if (QFontDatabase::families().contains("Fira Code"))
         mono = QFont("Fira Code", 10);
-        if (!QFontInfo(mono).fixedPitch())
-            mono = QFont("Cascadia Mono", 10);
-        if (!QFontInfo(mono).fixedPitch())
-            mono = QFont("Monospace", 10);
-    }
+    else if (QFontDatabase::families().contains("Cascadia Mono"))
+        mono = QFont("Cascadia Mono", 10);
+    else
+        mono = QFont("Monospace", 10);
 #endif
     mono.setStyleHint(QFont::Monospace);
 
