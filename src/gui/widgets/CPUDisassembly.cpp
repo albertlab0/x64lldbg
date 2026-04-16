@@ -659,6 +659,36 @@ uint64_t CPUDisassembly::selectedAddress() const
     return 0;
 }
 
+void CPUDisassembly::scrollContentsBy(int dx, int dy)
+{
+    QTableWidget::scrollContentsBy(dx, dy);
+
+    // When scrolling down and near the bottom, load more instructions
+    if (dy < 0 && !m_lines.isEmpty()) {  // dy < 0 means content moves up = scrolling down
+        QScrollBar* vbar = verticalScrollBar();
+        if (vbar && vbar->value() >= vbar->maximum() - 2)
+            loadMoreBelow();
+    }
+}
+
+void CPUDisassembly::loadMoreBelow()
+{
+    if (m_lines.isEmpty()) return;
+
+    // Disassemble starting from the instruction after the last one we have
+    const auto& lastLine = m_lines.last();
+    uint64_t nextAddr = lastLine.address + lastLine.bytes.size();
+    if (nextAddr == 0) return;
+
+    auto more = m_debugCore->disassemble(nextAddr, 64);
+    if (more.isEmpty()) return;
+
+    // Append new lines and rebuild the table
+    m_lines.append(more);
+    rebuildTable();
+    emit linesChanged();
+}
+
 void CPUDisassembly::promptSetLabel()
 {
     uint64_t addr = selectedAddress();

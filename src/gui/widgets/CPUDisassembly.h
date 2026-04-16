@@ -24,6 +24,7 @@ signals:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void scrollContentsBy(int dx, int dy) override;
 
 private:
     void setupColumns();
@@ -31,6 +32,7 @@ private:
     void setupContextMenu();
     void populateFromAddress(uint64_t address);
     void rebuildTable();
+    void loadMoreBelow();
     void updateHighlights(uint64_t pc);
     void promptSetLabel();
     QColor colorForMnemonic(const QString& mnemonic) const;
