@@ -32,6 +32,7 @@ private:
     void populateFromAddress(uint64_t address);
     void rebuildTable();
     void updateHighlights(uint64_t pc);
+    void promptSetLabel();
     QColor colorForMnemonic(const QString& mnemonic) const;
     QColor bgColorForMnemonic(const QString& mnemonic) const;
 

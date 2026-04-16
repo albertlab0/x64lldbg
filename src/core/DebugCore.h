@@ -168,7 +168,12 @@ public:
     QString targetPath() const { return m_targetPath; }
     uint64_t mainModuleBase();
 
+    // --- User labels ---
+    void setLabel(uint64_t address, const QString& text);
+    QString getLabel(uint64_t address) const;
+
 signals:
+    void labelsChanged();
     void processStateChanged(DebugCore::ProcessState state);
     void registersChanged();
     void memoryChanged();
@@ -200,6 +205,9 @@ private:
 
     // Previous register values for change detection
     QMap<QString, uint64_t> m_prevRegisters;
+
+    // User-defined labels (address → name)
+    QMap<uint64_t, QString> m_labels;
 
 #ifdef HAS_LLDB
     lldb::SBDebugger m_debugger;

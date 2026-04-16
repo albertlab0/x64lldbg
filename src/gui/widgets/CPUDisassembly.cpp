@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QKeyEvent>
+#include <QInputDialog>
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -127,6 +128,14 @@ void CPUDisassembly::setupContextMenu()
                 m_debugCore->toggleBreakpoint(addr);
         });
 
+        // Label
+        menu.addSeparator();
+        auto* setLabel = menu.addAction("Label Current Address");
+        setLabel->setShortcut(Config()->getShortcut("SetLabel").hotkey);
+        connect(setLabel, &QAction::triggered, this, [this]() {
+            promptSetLabel();
+        });
+
         menu.exec(viewport()->mapToGlobal(pos));
     });
 
@@ -166,6 +175,17 @@ void CPUDisassembly::setupContextMenu()
         uint64_t addr = selectedAddress();
         if (addr != 0)
             m_debugCore->runToCursor(addr);
+    });
+
+    // : — Set Label
+    addLocalAction("SetLabel", [this]() {
+        promptSetLabel();
+    });
+
+    // Refresh disassembly when labels change
+    connect(m_debugCore, &DebugCore::labelsChanged, this, [this]() {
+        if (!m_lines.isEmpty())
+            rebuildTable();
     });
 }
 
@@ -258,6 +278,7 @@ void CPUDisassembly::rebuildTable()
     setRowCount(m_lines.size());
 
     QColor addrColor = ConfigColor("DisassemblyAddressColor");
+    QColor labelColor = ConfigColor("DisassemblyLabelColor");
     QColor bytesColor = ConfigColor("DisassemblyBytesColor");
     QColor operColor = ConfigColor("DisassemblyTextColor");
     QColor ipBg = ConfigColor("CurrentIPBackgroundColor");
@@ -275,11 +296,13 @@ void CPUDisassembly::rebuildTable()
     for (int i = 0; i < m_lines.size(); i++) {
         const auto& line = m_lines[i];
 
-        // Address
-        auto* addrItem = new QTableWidgetItem(
-            QString("%1").arg(line.address, 16, 16, QChar('0')).toUpper()
-        );
-        addrItem->setForeground(addrColor);
+        // Address — append <label> if one is set
+        QString addrText = QString("%1").arg(line.address, 16, 16, QChar('0')).toUpper();
+        QString addrLabel = m_debugCore->getLabel(line.address);
+        if (!addrLabel.isEmpty())
+            addrText += " <" + addrLabel + ">";
+        auto* addrItem = new QTableWidgetItem(addrText);
+        addrItem->setForeground(addrLabel.isEmpty() ? addrColor : labelColor);
         setItem(i, 0, addrItem);
 
         // Bytes as hex string
@@ -298,11 +321,17 @@ void CPUDisassembly::rebuildTable()
         setItem(i, 2, mnemItem);
 
         // Operands — strip 0x prefix (x64dbg defaults to bare hex)
+        // For branch targets with labels, show <label> instead of raw address
         QString displayOper = line.operands;
         displayOper.replace("0x", "", Qt::CaseInsensitive);
-        auto* operItem = new QTableWidgetItem(displayOper);
         bool isBranch = line.mnemonic.startsWith('j') ||
                         line.mnemonic == "call" || line.mnemonic == "callq";
+        if (isBranch && line.branchTarget != 0) {
+            QString targetLabel = m_debugCore->getLabel(line.branchTarget);
+            if (!targetLabel.isEmpty())
+                displayOper = "<" + targetLabel + ">";
+        }
+        auto* operItem = new QTableWidgetItem(displayOper);
         operItem->setForeground(isBranch ?
             ConfigColor("DisassemblyAddressOperandColor") : operColor);
         setItem(i, 3, operItem);
@@ -628,4 +657,20 @@ uint64_t CPUDisassembly::selectedAddress() const
     if (row >= 0 && row < m_lines.size())
         return m_lines[row].address;
     return 0;
+}
+
+void CPUDisassembly::promptSetLabel()
+{
+    uint64_t addr = selectedAddress();
+    if (addr == 0) return;
+
+    QString current = m_debugCore->getLabel(addr);
+    bool ok;
+    QString label = QInputDialog::getText(
+        this, "Label",
+        QString("Label for %1:").arg(addr, 16, 16, QChar('0')).toUpper(),
+        QLineEdit::Normal, current, &ok);
+
+    if (ok)
+        m_debugCore->setLabel(addr, label.trimmed());
 }

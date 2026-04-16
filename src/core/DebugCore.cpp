@@ -1256,6 +1256,20 @@ uint64_t DebugCore::mainModuleBase()
 #endif
 }
 
+void DebugCore::setLabel(uint64_t address, const QString& text)
+{
+    if (text.isEmpty())
+        m_labels.remove(address);
+    else
+        m_labels[address] = text;
+    emit labelsChanged();
+}
+
+QString DebugCore::getLabel(uint64_t address) const
+{
+    return m_labels.value(address);
+}
+
 uint64_t DebugCore::findSymbolAddress(const QString& name)
 {
 #ifdef HAS_LLDB
