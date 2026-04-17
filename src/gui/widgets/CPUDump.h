@@ -12,6 +12,8 @@ class CPUDumpView : public QTableWidget
 public:
     explicit CPUDumpView(DebugCore* debugCore, QWidget* parent = nullptr);
 
+    uint64_t baseAddress() const { return m_baseAddress; }
+
 public slots:
     void refresh();
     void goToAddress(uint64_t address);

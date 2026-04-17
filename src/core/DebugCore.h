@@ -42,8 +42,11 @@ struct BreakpointInfo {
     QString module;
     bool enabled;
     bool isHardware;
-    QString condition;
+    QString condition;       // break condition (LLDB expression)
     uint32_t hitCount;
+    QString logText;         // log message with {register} placeholders
+    QString logCondition;    // expression: log only when true (empty = always)
+    bool fastResume = false; // skip break, just log and continue
 };
 
 struct MemoryRegion {
@@ -137,6 +140,13 @@ public:
     bool toggleBreakpoint(uint64_t address);
     QVector<BreakpointInfo> getBreakpoints() const;
 
+    // --- Breakpoint properties (log, conditions) ---
+    void setBreakpointLogText(uint32_t id, const QString& logText);
+    void setBreakpointLogCondition(uint32_t id, const QString& logCondition);
+    void setBreakpointCondition(uint32_t id, const QString& condition);
+    void setBreakpointFastResume(uint32_t id, bool fastResume);
+    QString formatLogText(const QString& logText);  // expand {register} placeholders
+
     // --- Data accessors ---
     ProcessState processState() const { return m_state; }
     uint64_t currentPC();
@@ -196,6 +206,8 @@ private:
     void emitStepRefresh();   // lightweight refresh for step completion
     void startEventListener();
     void stopEventListener();
+    QString formatExpression(const QString& expr);  // evaluate single {expr}
+    bool handleBreakpointLog(uint64_t address);     // log + fast-resume; returns true to resume
 
     ProcessState m_state = Unloaded;
     AsmFlavor m_asmFlavor = Intel;
@@ -208,6 +220,14 @@ private:
 
     // User-defined labels (address → name)
     QMap<uint64_t, QString> m_labels;
+
+    // Per-breakpoint extra data (keyed by LLDB breakpoint ID)
+    struct BpExtra {
+        QString logText;
+        QString logCondition;
+        bool fastResume = false;
+    };
+    QMap<uint32_t, BpExtra> m_bpExtras;
 
 #ifdef HAS_LLDB
     lldb::SBDebugger m_debugger;

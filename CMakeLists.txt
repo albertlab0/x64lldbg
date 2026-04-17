@@ -101,6 +101,8 @@ set(SOURCES
     # Dialogs
     src/gui/dialogs/GotoDialog.h
     src/gui/dialogs/GotoDialog.cpp
+    src/gui/dialogs/EditBreakpointDialog.h
+    src/gui/dialogs/EditBreakpointDialog.cpp
 )
 
 # --- Resources ---

@@ -19,6 +19,8 @@ signals:
 private:
     void setupColumns();
     void applyStyle();
+    void setupContextMenu();
+    void editBreakpointAt(int row);
 
     DebugCore* m_debugCore;
 };

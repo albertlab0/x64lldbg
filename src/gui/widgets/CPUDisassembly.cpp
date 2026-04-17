@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QInputDialog>
+#include "gui/dialogs/EditBreakpointDialog.h"
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -130,6 +131,12 @@ void CPUDisassembly::setupContextMenu()
                 m_debugCore->toggleBreakpoint(addr);
         });
 
+        auto* editBP = menu.addAction("Edit Breakpoint...");
+        editBP->setShortcut(Config()->getShortcut("EditBreakpoint").hotkey);
+        connect(editBP, &QAction::triggered, this, [this]() {
+            promptEditBreakpoint();
+        });
+
         // Label
         menu.addSeparator();
         auto* setLabel = menu.addAction("Label Current Address");
@@ -177,6 +184,11 @@ void CPUDisassembly::setupContextMenu()
     // : — Set Label
     addLocalAction("SetLabel", [this]() {
         promptSetLabel();
+    });
+
+    // Shift+F2 — Edit Breakpoint
+    addLocalAction("EditBreakpoint", [this]() {
+        promptEditBreakpoint();
     });
 
     // Refresh disassembly when labels change
@@ -831,4 +843,44 @@ void CPUDisassembly::promptSetLabel()
 
     if (ok)
         m_debugCore->setLabel(addr, label.trimmed());
+}
+
+void CPUDisassembly::promptEditBreakpoint()
+{
+    uint64_t addr = selectedAddress();
+    if (addr == 0) return;
+
+    // Find existing breakpoint at this address, or create one first
+    auto bps = m_debugCore->getBreakpoints();
+    BreakpointInfo bpInfo{};
+    bool found = false;
+    for (const auto& bp : bps) {
+        if (bp.address == addr) {
+            bpInfo = bp;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        // Create a breakpoint first, then edit it
+        m_debugCore->addBreakpoint(addr);
+        bps = m_debugCore->getBreakpoints();
+        for (const auto& bp : bps) {
+            if (bp.address == addr) {
+                bpInfo = bp;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return;
+    }
+
+    EditBreakpointDialog dlg(m_debugCore, bpInfo, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        m_debugCore->setBreakpointCondition(bpInfo.id, dlg.breakCondition());
+        m_debugCore->setBreakpointLogText(bpInfo.id, dlg.logText());
+        m_debugCore->setBreakpointLogCondition(bpInfo.id, dlg.logCondition());
+        m_debugCore->setBreakpointFastResume(bpInfo.id, dlg.fastResume());
+    }
 }

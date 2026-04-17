@@ -739,9 +739,86 @@ QVector<BreakpointInfo> DebugCore::getBreakpoints() const
             continue;
         }
 
+        // Merge our extra data (log text, etc.)
+        if (m_bpExtras.contains(info.id)) {
+            const auto& extra = m_bpExtras[info.id];
+            info.logText = extra.logText;
+            info.logCondition = extra.logCondition;
+            info.fastResume = extra.fastResume;
+        }
+
         result.append(info);
     }
 #endif
+    return result;
+}
+
+// --- Breakpoint properties ---
+
+void DebugCore::setBreakpointCondition(uint32_t id, const QString& condition)
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return;
+    lldb::SBBreakpoint bp = m_target.FindBreakpointByID(id);
+    if (bp.IsValid()) {
+        bp.SetCondition(condition.isEmpty() ? nullptr : condition.toStdString().c_str());
+        emit breakpointsChanged();
+    }
+#else
+    Q_UNUSED(id) Q_UNUSED(condition)
+#endif
+}
+
+void DebugCore::setBreakpointLogText(uint32_t id, const QString& logText)
+{
+    m_bpExtras[id].logText = logText;
+    emit breakpointsChanged();
+}
+
+void DebugCore::setBreakpointLogCondition(uint32_t id, const QString& logCondition)
+{
+    m_bpExtras[id].logCondition = logCondition;
+    emit breakpointsChanged();
+}
+
+void DebugCore::setBreakpointFastResume(uint32_t id, bool fastResume)
+{
+    m_bpExtras[id].fastResume = fastResume;
+    emit breakpointsChanged();
+}
+
+QString DebugCore::formatLogText(const QString& logText)
+{
+    // Expand {register} and {expression} placeholders in log text
+    // Supports: {rax}, {rip}, {[address]}, {s:rsi} (string), etc.
+    QString result;
+    int i = 0;
+    while (i < logText.size()) {
+        if (logText[i] == '{') {
+            int end = logText.indexOf('}', i + 1);
+            if (end < 0) {
+                result += logText[i];
+                i++;
+                continue;
+            }
+            // Escaped {{ → literal {
+            if (i + 1 < logText.size() && logText[i + 1] == '{') {
+                result += '{';
+                i += 2;
+                continue;
+            }
+            QString expr = logText.mid(i + 1, end - i - 1).trimmed();
+            QString formatted = formatExpression(expr);
+            result += formatted;
+            i = end + 1;
+        } else if (logText[i] == '}' && i + 1 < logText.size() && logText[i + 1] == '}') {
+            result += '}';
+            i += 2;
+        } else {
+            result += logText[i];
+            i++;
+        }
+    }
     return result;
 }
 
@@ -1320,6 +1397,115 @@ uint64_t DebugCore::findSymbolAddress(const QString& name)
     return 0;
 }
 
+// --- Breakpoint log formatting ---
+
+QString DebugCore::formatExpression(const QString& expr)
+{
+    // Handle type prefix: {s:expr} for string, {p:expr} for pointer, etc.
+    QString type;
+    QString body = expr;
+    int colonPos = expr.indexOf(':');
+    if (colonPos == 1) {
+        type = expr.left(1).toLower();
+        body = expr.mid(2).trimmed();
+    }
+
+#ifdef HAS_LLDB
+    if (!m_process.IsValid()) return "???";
+    lldb::SBThread thread = m_process.GetSelectedThread();
+    if (!thread.IsValid()) return "???";
+    lldb::SBFrame frame = thread.GetSelectedFrame();
+    if (!frame.IsValid()) return "???";
+
+    // Try as register name first (fast path)
+    lldb::SBValue regVal = frame.FindRegister(body.toStdString().c_str());
+    if (regVal.IsValid()) {
+        uint64_t val = regVal.GetValueAsUnsigned(0);
+        if (type == "s") {
+            // String dereference
+            QString str = getStringAt(val);
+            return str.isEmpty() ? QString("0x%1").arg(val, 0, 16) : "\"" + str + "\"";
+        }
+        if (type == "d")
+            return QString::number(static_cast<int64_t>(val));
+        if (type == "u")
+            return QString::number(val);
+        // Default: hex
+        return QString("0x%1").arg(val, 0, 16);
+    }
+
+    // Try as LLDB expression (handles memory reads, arithmetic, etc.)
+    lldb::SBValue exprVal = frame.EvaluateExpression(body.toStdString().c_str());
+    if (exprVal.IsValid() && exprVal.GetError().Success()) {
+        uint64_t val = exprVal.GetValueAsUnsigned(0);
+        if (type == "s") {
+            QString str = getStringAt(val);
+            return str.isEmpty() ? QString("0x%1").arg(val, 0, 16) : "\"" + str + "\"";
+        }
+        if (type == "d")
+            return QString::number(static_cast<int64_t>(val));
+        if (type == "u")
+            return QString::number(val);
+        return QString("0x%1").arg(val, 0, 16);
+    }
+#else
+    Q_UNUSED(type) Q_UNUSED(body)
+#endif
+    return "???";
+}
+
+bool DebugCore::handleBreakpointLog(uint64_t address)
+{
+    // Find which breakpoint was hit at this address
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return false;
+
+    for (uint32_t i = 0; i < m_target.GetNumBreakpoints(); i++) {
+        lldb::SBBreakpoint bp = m_target.GetBreakpointAtIndex(i);
+        if (!bp.IsValid() || bp.GetNumLocations() == 0) continue;
+
+        lldb::SBBreakpointLocation loc = bp.GetLocationAtIndex(0);
+        uint64_t bpAddr = loc.GetAddress().GetLoadAddress(m_target);
+        if (bpAddr != address) continue;
+
+        uint32_t id = bp.GetID();
+        if (!m_bpExtras.contains(id)) continue;
+
+        const auto& extra = m_bpExtras[id];
+
+        // Check log condition (empty = always log)
+        bool shouldLog = true;
+        if (!extra.logCondition.isEmpty()) {
+            lldb::SBThread thread = m_process.GetSelectedThread();
+            if (thread.IsValid()) {
+                lldb::SBFrame frame = thread.GetSelectedFrame();
+                if (frame.IsValid()) {
+                    lldb::SBValue condVal = frame.EvaluateExpression(
+                        extra.logCondition.toStdString().c_str());
+                    if (condVal.IsValid() && condVal.GetError().Success())
+                        shouldLog = condVal.GetValueAsUnsigned(0) != 0;
+                }
+            }
+        }
+
+        // Emit formatted log text
+        if (shouldLog && !extra.logText.isEmpty()) {
+            QString formatted = formatLogText(extra.logText);
+            emit outputReceived(QString("[BP %1] %2").arg(id).arg(formatted));
+        }
+
+        // Fast resume: skip breaking, just continue
+        if (extra.fastResume)
+            return true;
+
+        break;
+    }
+#else
+    Q_UNUSED(address)
+#endif
+    return false;
+}
+
 // --- Event handling slots ---
 
 void DebugCore::onProcessStopped()
@@ -1362,6 +1548,13 @@ void DebugCore::onProcessStopped()
             } else {
                 emitAllRefresh();
                 if (reason == lldb::eStopReasonBreakpoint) {
+                    // Handle logging and fast-resume before UI update
+                    bool shouldResume = handleBreakpointLog(pc);
+                    if (shouldResume) {
+                        // Fast resume: continue without stopping in UI
+                        continueExec();
+                        return;
+                    }
                     emit breakpointHit(pc);
                 }
             }

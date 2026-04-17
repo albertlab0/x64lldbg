@@ -1,7 +1,9 @@
 #include "BreakpointsView.h"
 #include "common/Configuration.h"
+#include "gui/dialogs/EditBreakpointDialog.h"
 
 #include <QHeaderView>
+#include <QMenu>
 
 BreakpointsView::BreakpointsView(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -9,15 +11,10 @@ BreakpointsView::BreakpointsView(DebugCore* debugCore, QWidget* parent)
 {
     setupColumns();
     applyStyle();
+    setupContextMenu();
 
     connect(this, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
-        // Address is in column 1, formatted as "0x..."
-        if (auto* addrItem = item(row, 1)) {
-            bool ok;
-            uint64_t addr = addrItem->text().toULongLong(&ok, 16);
-            if (ok)
-                emit breakpointDoubleClicked(addr);
-        }
+        editBreakpointAt(row);
     });
 }
 
@@ -55,6 +52,75 @@ void BreakpointsView::applyStyle()
     ).arg(bg.name(), fg.name(), grid.name(), alt.name(), hdrBg.name(), hdrFg.name()));
 }
 
+void BreakpointsView::setupContextMenu()
+{
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        int row = rowAt(pos.y());
+        if (row < 0) return;
+
+        QMenu menu(this);
+
+        auto* editAction = menu.addAction("Edit Breakpoint...");
+        connect(editAction, &QAction::triggered, this, [this, row]() {
+            editBreakpointAt(row);
+        });
+
+        menu.addSeparator();
+
+        auto* deleteAction = menu.addAction("Delete Breakpoint");
+        deleteAction->setShortcut(Qt::Key_Delete);
+        connect(deleteAction, &QAction::triggered, this, [this, row]() {
+            if (auto* addrItem = item(row, 1)) {
+                bool ok;
+                uint64_t addr = addrItem->text().toULongLong(&ok, 16);
+                if (ok)
+                    m_debugCore->removeBreakpoint(addr);
+            }
+        });
+
+        auto* toggleAction = menu.addAction("Enable/Disable");
+        toggleAction->setShortcut(Qt::Key_Space);
+        connect(toggleAction, &QAction::triggered, this, [this, row]() {
+            if (auto* addrItem = item(row, 1)) {
+                bool ok;
+                uint64_t addr = addrItem->text().toULongLong(&ok, 16);
+                if (ok)
+                    m_debugCore->toggleBreakpoint(addr);
+            }
+        });
+
+        menu.addSeparator();
+
+        auto* gotoAction = menu.addAction("Go to in Disassembly");
+        connect(gotoAction, &QAction::triggered, this, [this, row]() {
+            if (auto* addrItem = item(row, 1)) {
+                bool ok;
+                uint64_t addr = addrItem->text().toULongLong(&ok, 16);
+                if (ok)
+                    emit breakpointDoubleClicked(addr);
+            }
+        });
+
+        menu.exec(viewport()->mapToGlobal(pos));
+    });
+}
+
+void BreakpointsView::editBreakpointAt(int row)
+{
+    auto breakpoints = m_debugCore->getBreakpoints();
+    if (row < 0 || row >= breakpoints.size()) return;
+
+    const auto& bp = breakpoints[row];
+    EditBreakpointDialog dlg(m_debugCore, bp, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        m_debugCore->setBreakpointCondition(bp.id, dlg.breakCondition());
+        m_debugCore->setBreakpointLogText(bp.id, dlg.logText());
+        m_debugCore->setBreakpointLogCondition(bp.id, dlg.logCondition());
+        m_debugCore->setBreakpointFastResume(bp.id, dlg.fastResume());
+    }
+}
+
 void BreakpointsView::refresh()
 {
     auto breakpoints = m_debugCore->getBreakpoints();
@@ -81,6 +147,15 @@ void BreakpointsView::refresh()
         setItem(i, 3, statusItem);
 
         setItem(i, 4, new QTableWidgetItem(QString::number(bp.hitCount)));
-        setItem(i, 5, new QTableWidgetItem(bp.condition));
+
+        // Show condition + log summary
+        QString condText = bp.condition;
+        if (!bp.logText.isEmpty()) {
+            if (!condText.isEmpty()) condText += " | ";
+            condText += "Log: " + bp.logText;
+            if (bp.fastResume)
+                condText += " [FR]";
+        }
+        setItem(i, 5, new QTableWidgetItem(condText));
     }
 }

@@ -194,6 +194,13 @@ CPUDump::CPUDump(DebugCore* debugCore, QWidget* parent)
     connect(m_tabBar, &QTabBar::currentChanged, this, [this, stack](int index) {
         m_currentTab = index;
         stack->setCurrentIndex(index);
+
+        // Auto-populate empty dump tabs with Dump 1's address
+        if (m_dumpViews[index]->baseAddress() == 0) {
+            uint64_t addr = m_dumpViews[0]->baseAddress();
+            if (addr != 0)
+                m_dumpViews[index]->goToAddress(addr);
+        }
     });
 
     // Style the tab bar to match theme
