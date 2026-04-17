@@ -34,13 +34,14 @@ void CPUDumpView::setupColumns()
     horizontalHeader()->setVisible(false);
     horizontalHeader()->setMinimumSectionSize(10);
 
-    // Address column
-    horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    // Address column — fixed width for 16 hex chars
+    horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
+    setColumnWidth(0, 150);
 
-    // Hex byte columns: fixed width
+    // Hex byte columns: fixed width (28px to accommodate macOS font rendering)
     for (int i = 1; i <= 16; i++) {
         horizontalHeader()->setSectionResizeMode(i, QHeaderView::Fixed);
-        setColumnWidth(i, 22);
+        setColumnWidth(i, 28);
     }
 
     // ASCII column stretches
@@ -96,6 +97,9 @@ void CPUDumpView::populate()
 
     int totalBytes = rows * 16;
     QByteArray data = m_debugCore->readMemory(m_baseAddress, totalBytes);
+
+    qDebug("CPUDump::populate addr=0x%llx readSize=%d dataSize=%d cols=%d",
+           (unsigned long long)m_baseAddress, totalBytes, data.size(), columnCount());
 
     // Ensure data is exactly the right size — pad with zeros if short
     if (data.size() < totalBytes)

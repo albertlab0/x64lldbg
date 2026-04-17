@@ -667,6 +667,13 @@ void CPUDisassembly::wheelEvent(QWheelEvent* event)
     // Grab focus on wheel so scrolling works without clicking first
     if (!hasFocus())
         setFocus(Qt::MouseFocusReason);
+
+    // Detect scroll-up at top: Qt won't call scrollContentsBy when
+    // the scrollbar is already at 0, so we must catch it here.
+    QScrollBar* vbar = verticalScrollBar();
+    if (event->angleDelta().y() > 0 && vbar && vbar->value() == 0)
+        loadMoreAbove();
+
     QTableWidget::wheelEvent(event);
 }
 
