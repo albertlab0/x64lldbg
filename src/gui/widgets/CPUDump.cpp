@@ -94,8 +94,12 @@ void CPUDumpView::populate()
     QColor hexColor = ConfigColor("HexDumpTextColor");
     QColor asciiColor = ConfigColor("HexDumpAsciiColor");
 
-    QByteArray data = m_debugCore->readMemory(m_baseAddress, rows * 16);
-    bool hasData = !data.isEmpty();
+    int totalBytes = rows * 16;
+    QByteArray data = m_debugCore->readMemory(m_baseAddress, totalBytes);
+
+    // Ensure data is exactly the right size — pad with zeros if short
+    if (data.size() < totalBytes)
+        data.append(QByteArray(totalBytes - data.size(), '\0'));
 
     for (int row = 0; row < rows; row++) {
         uint64_t addr = m_baseAddress + row * 16;
@@ -109,21 +113,16 @@ void CPUDumpView::populate()
         QString ascii;
         for (int col = 0; col < 16; col++) {
             int idx = row * 16 + col;
+            uint8_t byte = static_cast<uint8_t>(data[idx]);
 
-            QString hexText;
-            if (hasData && idx < data.size()) {
-                uint8_t byte = static_cast<uint8_t>(data[idx]);
-                hexText = QString("%1").arg(byte, 2, 16, QChar('0')).toUpper();
-                ascii += (byte >= 0x20 && byte < 0x7F) ? QChar(byte) : QChar('.');
-            } else {
-                hexText = "??";
-                ascii += '?';
-            }
-
-            auto* hexItem = new QTableWidgetItem(hexText);
+            auto* hexItem = new QTableWidgetItem(
+                QString("%1").arg(byte, 2, 16, QChar('0')).toUpper()
+            );
             hexItem->setForeground(hexColor);
             hexItem->setTextAlignment(Qt::AlignCenter);
             setItem(row, col + 1, hexItem);
+
+            ascii += (byte >= 0x20 && byte < 0x7F) ? QChar(byte) : QChar('.');
         }
 
         auto* asciiItem = new QTableWidgetItem(ascii);
