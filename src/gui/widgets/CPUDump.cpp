@@ -30,23 +30,9 @@ void CPUDumpView::setupColumns()
     // we use: Address + 16 hex byte cols + ASCII = 18 columns
     setColumnCount(18);
 
-    // Show header with custom labels
-    horizontalHeader()->setVisible(true);
-    horizontalHeader()->setHighlightSections(false);
-    horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    // No column header (x64dbg-style)
+    horizontalHeader()->setVisible(false);
     horizontalHeader()->setMinimumSectionSize(10);
-
-    // Set header labels
-    QStringList headers;
-    headers << "Address";
-    for (int i = 0; i < 16; i++) {
-        if (i == 0)
-            headers << "Hex";
-        else
-            headers << "";
-    }
-    headers << "ASCII";
-    setHorizontalHeaderLabels(headers);
 
     // Address column
     horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
@@ -100,7 +86,6 @@ void CPUDumpView::populate()
     // Restore columns if this is the first populate
     if (columnCount() == 0)
         setupColumns();
-    horizontalHeader()->setVisible(true);
 
     int rows = 20;
     setRowCount(rows);
@@ -110,12 +95,13 @@ void CPUDumpView::populate()
     QColor asciiColor = ConfigColor("HexDumpAsciiColor");
 
     QByteArray data = m_debugCore->readMemory(m_baseAddress, rows * 16);
+    bool hasData = !data.isEmpty();
 
     for (int row = 0; row < rows; row++) {
         uint64_t addr = m_baseAddress + row * 16;
 
         auto* addrItem = new QTableWidgetItem(
-            QString("%1").arg(addr, 8, 16, QChar('0')).toUpper()
+            QString("%1").arg(addr, 16, 16, QChar('0')).toUpper()
         );
         addrItem->setForeground(addrColor);
         setItem(row, 0, addrItem);
@@ -123,16 +109,21 @@ void CPUDumpView::populate()
         QString ascii;
         for (int col = 0; col < 16; col++) {
             int idx = row * 16 + col;
-            uint8_t byte = (idx < data.size()) ? static_cast<uint8_t>(data[idx]) : 0;
 
-            auto* hexItem = new QTableWidgetItem(
-                QString("%1").arg(byte, 2, 16, QChar('0')).toUpper()
-            );
+            QString hexText;
+            if (hasData && idx < data.size()) {
+                uint8_t byte = static_cast<uint8_t>(data[idx]);
+                hexText = QString("%1").arg(byte, 2, 16, QChar('0')).toUpper();
+                ascii += (byte >= 0x20 && byte < 0x7F) ? QChar(byte) : QChar('.');
+            } else {
+                hexText = "??";
+                ascii += '?';
+            }
+
+            auto* hexItem = new QTableWidgetItem(hexText);
             hexItem->setForeground(hexColor);
             hexItem->setTextAlignment(Qt::AlignCenter);
             setItem(row, col + 1, hexItem);
-
-            ascii += (byte >= 0x20 && byte < 0x7F) ? QChar(byte) : QChar('.');
         }
 
         auto* asciiItem = new QTableWidgetItem(ascii);

@@ -36,6 +36,7 @@ private:
     void setupContextMenu();
     void populateFromAddress(uint64_t address);
     void rebuildTable();
+    void loadMoreAbove();
     void loadMoreBelow();
     void updateHighlights(uint64_t pc);
     void promptSetLabel();

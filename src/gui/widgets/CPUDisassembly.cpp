@@ -740,12 +740,56 @@ void CPUDisassembly::scrollContentsBy(int dx, int dy)
 {
     QTableWidget::scrollContentsBy(dx, dy);
 
+    if (m_lines.isEmpty()) return;
+    QScrollBar* vbar = verticalScrollBar();
+    if (!vbar) return;
+
     // When scrolling down and near the bottom, load more instructions
-    if (dy < 0 && !m_lines.isEmpty()) {  // dy < 0 means content moves up = scrolling down
-        QScrollBar* vbar = verticalScrollBar();
-        if (vbar && vbar->value() >= vbar->maximum() - 2)
-            loadMoreBelow();
+    if (dy < 0 && vbar->value() >= vbar->maximum() - 2)  // dy < 0 = scrolling down
+        loadMoreBelow();
+
+    // When scrolling up and at the top, load earlier instructions
+    if (dy > 0 && vbar->value() <= 2)  // dy > 0 = scrolling up
+        loadMoreAbove();
+}
+
+void CPUDisassembly::loadMoreAbove()
+{
+    if (m_lines.isEmpty()) return;
+
+    uint64_t firstAddr = m_lines.first().address;
+    if (firstAddr == 0) return;
+
+    // Disassemble from an earlier address.  x86 instructions are variable-
+    // length (1-15 bytes), so we go back ~64*8 bytes and ask for 64 lines,
+    // then keep only lines strictly before our current first address.
+    uint64_t backAmount = 512;
+    uint64_t startAddr = (firstAddr > backAmount) ? firstAddr - backAmount : 0;
+    if (startAddr == firstAddr) return;
+
+    auto earlier = m_debugCore->disassemble(startAddr, 128);
+    if (earlier.isEmpty()) return;
+
+    // Keep only instructions before our first address
+    QVector<DisassemblyLine> prepend;
+    for (const auto& line : earlier) {
+        if (line.address >= firstAddr)
+            break;
+        prepend.append(line);
     }
+    if (prepend.isEmpty()) return;
+
+    int addedRows = prepend.size();
+    m_lines = prepend + m_lines;
+
+    // Rebuild table and restore scroll position so the view doesn't jump
+    rebuildTable();
+    emit linesChanged();
+
+    // Scroll down by the number of prepended rows to keep the same view
+    QScrollBar* vbar = verticalScrollBar();
+    if (vbar)
+        vbar->setValue(vbar->value() + addedRows);
 }
 
 void CPUDisassembly::loadMoreBelow()
