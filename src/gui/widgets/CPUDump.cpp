@@ -98,9 +98,6 @@ void CPUDumpView::populate()
     int totalBytes = rows * 16;
     QByteArray data = m_debugCore->readMemory(m_baseAddress, totalBytes);
 
-    qDebug("CPUDump::populate addr=0x%llx readSize=%d dataSize=%d cols=%d",
-           (unsigned long long)m_baseAddress, totalBytes, data.size(), columnCount());
-
     // Ensure data is exactly the right size — pad with zeros if short
     if (data.size() < totalBytes)
         data.append(QByteArray(totalBytes - data.size(), '\0'));
