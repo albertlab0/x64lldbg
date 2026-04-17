@@ -396,18 +396,23 @@ void CPUDisassembly::rebuildTable()
             }
         }
         // Scroll to goto target or IP row
+        // Suppress auto-scroll to prevent cascading loadMoreAbove/Below
         if (isGoto) {
+            m_suppressAutoScroll = true;
             blockSignals(true);
             clearSelection();
             setCurrentCell(i, 0);
             scrollToItem(item(i, 0), QAbstractItemView::PositionAtCenter);
             blockSignals(false);
+            m_suppressAutoScroll = false;
             emit addressSelected(line.address);
         } else if (isIP && m_gotoAddress == 0) {
+            m_suppressAutoScroll = true;
             blockSignals(true);
             setCurrentCell(i, 0);
             scrollToItem(item(i, 0), QAbstractItemView::PositionAtCenter);
             blockSignals(false);
+            m_suppressAutoScroll = false;
             emit addressSelected(line.address);
         }
     }
@@ -758,6 +763,9 @@ void CPUDisassembly::mouseReleaseEvent(QMouseEvent* event)
 void CPUDisassembly::scrollContentsBy(int dx, int dy)
 {
     QTableWidget::scrollContentsBy(dx, dy);
+
+    // Don't trigger infinite scroll during programmatic goto/rebuild
+    if (m_suppressAutoScroll) return;
 
     if (m_lines.isEmpty()) return;
     QScrollBar* vbar = verticalScrollBar();

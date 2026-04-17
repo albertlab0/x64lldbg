@@ -54,4 +54,5 @@ private:
     int m_resizeCol = -1;       // column being resized (-1 = none)
     int m_resizeDragStartX = 0; // mouse X at drag start
     int m_resizeOrigWidth = 0;  // column width at drag start
+    bool m_suppressAutoScroll = false; // guard against cascading scroll during goto
 };

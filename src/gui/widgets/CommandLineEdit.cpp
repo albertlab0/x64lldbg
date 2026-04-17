@@ -220,11 +220,7 @@ uint64_t CommandLineEdit::evaluateExpression(const QString& expr, bool* ok)
         if (t.startsWith("0x", Qt::CaseInsensitive))
             val = t.mid(2).toULongLong(&termOk, 16);
 
-        // Try decimal
-        if (!termOk)
-            val = t.toULongLong(&termOk, 10);
-
-        // Try plain hex
+        // Try plain hex (x64dbg defaults to hex for bare numbers)
         if (!termOk)
             val = t.toULongLong(&termOk, 16);
 

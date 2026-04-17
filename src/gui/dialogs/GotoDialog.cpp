@@ -126,17 +126,12 @@ uint64_t GotoDialog::evaluateExpression(const QString& expr, bool* ok)
         uint64_t val = 0;
         QString t = term.second;
 
-        // Try as hex number (0x... or plain hex)
+        // Try as hex number (0x... prefix)
         if (t.startsWith("0x", Qt::CaseInsensitive)) {
             val = t.mid(2).toULongLong(&termOk, 16);
         }
 
-        // Try as plain decimal number
-        if (!termOk) {
-            val = t.toULongLong(&termOk, 10);
-        }
-
-        // Try as plain hex (no 0x prefix, but looks like hex)
+        // Try as hex without prefix (x64dbg defaults to hex for bare numbers)
         if (!termOk) {
             val = t.toULongLong(&termOk, 16);
         }
