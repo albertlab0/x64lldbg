@@ -97,12 +97,16 @@ set(SOURCES
     src/gui/widgets/LogView.cpp
     src/gui/widgets/CommandLineEdit.h
     src/gui/widgets/CommandLineEdit.cpp
+    src/gui/widgets/ScriptView.h
+    src/gui/widgets/ScriptView.cpp
 
     # Dialogs
     src/gui/dialogs/GotoDialog.h
     src/gui/dialogs/GotoDialog.cpp
     src/gui/dialogs/EditBreakpointDialog.h
     src/gui/dialogs/EditBreakpointDialog.cpp
+    src/gui/dialogs/ScriptEditorDialog.h
+    src/gui/dialogs/ScriptEditorDialog.cpp
 )
 
 # --- Resources ---

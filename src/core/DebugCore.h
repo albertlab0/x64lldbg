@@ -166,6 +166,10 @@ public:
     QString getStringAt(uint64_t address, int maxLen = 256);
     QString getSymbolAt(uint64_t address);
 
+    // --- Command execution (LLDB commands + Python via 'script') ---
+    bool executeCommand(const QString& command, QString& output, QString& error);
+    bool executeScript(const QString& pythonCode, QString& output, QString& error);
+
     // --- Symbol lookup ---
     uint64_t findSymbolAddress(const QString& name);
 

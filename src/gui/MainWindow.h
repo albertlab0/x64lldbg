@@ -13,6 +13,7 @@ class LogView;
 class QLabel;
 class QToolBar;
 class CommandLineEdit;
+class ScriptView;
 
 class MainWindow : public QMainWindow
 {
@@ -43,6 +44,7 @@ private:
     CallStackView*   m_callStackView;
     ThreadsView*     m_threadsView;
     LogView*         m_logView;
+    ScriptView*      m_scriptView;
 
     // Toolbar
     QToolBar* m_toolBar;

@@ -31,6 +31,7 @@
 #include "gui/widgets/LogView.h"
 #include "gui/widgets/CommandLineEdit.h"
 #include "gui/widgets/CPUArgumentWidget.h"
+#include "gui/widgets/ScriptView.h"
 
 MainWindow::MainWindow(DebugCore* debugCore, QWidget* parent)
     : QMainWindow(parent)
@@ -243,6 +244,7 @@ void MainWindow::createCentralTabs()
     m_memoryMapView   = new MemoryMapView(m_debugCore, this);
     m_callStackView   = new CallStackView(m_debugCore, this);
     m_threadsView     = new ThreadsView(m_debugCore, this);
+    m_scriptView      = new ScriptView(m_debugCore, this);
 
     m_tabWidget->addTab(m_cpuWidget,       "CPU");
     m_tabWidget->addTab(m_logView,         "Log");
@@ -250,6 +252,7 @@ void MainWindow::createCentralTabs()
     m_tabWidget->addTab(m_memoryMapView,   "Memory Map");
     m_tabWidget->addTab(m_callStackView,   "Call Stack");
     m_tabWidget->addTab(m_threadsView,     "Threads");
+    m_tabWidget->addTab(m_scriptView,      "Script");
 
     // CPU tab selected by default
     m_tabWidget->setCurrentIndex(0);

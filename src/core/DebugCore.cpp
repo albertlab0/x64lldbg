@@ -1415,6 +1415,86 @@ uint64_t DebugCore::findSymbolAddress(const QString& name)
     return 0;
 }
 
+// --- Command execution ---
+
+bool DebugCore::executeCommand(const QString& command, QString& output, QString& error)
+{
+#ifdef HAS_LLDB
+    if (!m_debugger.IsValid()) {
+        error = "Debugger not initialized";
+        return false;
+    }
+
+    lldb::SBCommandInterpreter interp = m_debugger.GetCommandInterpreter();
+    if (!interp.IsValid()) {
+        error = "Command interpreter not available";
+        return false;
+    }
+
+    lldb::SBCommandReturnObject result;
+    lldb::ReturnStatus status = interp.HandleCommand(
+        command.toStdString().c_str(), result, /*add_to_history=*/true);
+
+    // Capture output and error
+    const char* out = result.GetOutput();
+    const char* err = result.GetError();
+    if (out && out[0])
+        output = QString::fromUtf8(out).trimmed();
+    if (err && err[0])
+        error = QString::fromUtf8(err).trimmed();
+
+    return result.Succeeded();
+#else
+    Q_UNUSED(command)
+    output = "[no LLDB] command execution not available";
+    return false;
+#endif
+}
+
+bool DebugCore::executeScript(const QString& pythonCode, QString& output, QString& error)
+{
+    // Wrap multi-line Python code as an LLDB 'script' command.
+    // For multi-line scripts, we use HandleCommand with "script"
+    // which enters Python mode, then feed each line.
+#ifdef HAS_LLDB
+    if (!m_debugger.IsValid()) {
+        error = "Debugger not initialized";
+        return false;
+    }
+
+    lldb::SBCommandInterpreter interp = m_debugger.GetCommandInterpreter();
+    if (!interp.IsValid()) {
+        error = "Command interpreter not available";
+        return false;
+    }
+
+    // For multi-line Python, wrap in a single exec() call
+    // Escape the code for embedding in a Python string
+    QString escaped = pythonCode;
+    escaped.replace("\\", "\\\\");
+    escaped.replace("'", "\\'");
+    escaped.replace("\n", "\\n");
+
+    QString wrappedCmd = QString("script exec('%1')").arg(escaped);
+
+    lldb::SBCommandReturnObject result;
+    interp.HandleCommand(wrappedCmd.toStdString().c_str(), result, false);
+
+    const char* out = result.GetOutput();
+    const char* err = result.GetError();
+    if (out && out[0])
+        output = QString::fromUtf8(out).trimmed();
+    if (err && err[0])
+        error = QString::fromUtf8(err).trimmed();
+
+    return result.Succeeded();
+#else
+    Q_UNUSED(pythonCode)
+    output = "[no LLDB] Python scripting not available";
+    return false;
+#endif
+}
+
 // --- Breakpoint log formatting ---
 
 QString DebugCore::formatExpression(const QString& expr)
