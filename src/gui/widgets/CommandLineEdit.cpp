@@ -82,8 +82,14 @@ void CommandLineEdit::executeCommand(const QString& cmd)
             args = argStr.split(',', Qt::SkipEmptyParts);
         else
             args = argStr.split(' ', Qt::SkipEmptyParts);
-        for (auto& a : args)
+        for (auto& a : args) {
             a = a.trimmed();
+            // Strip surrounding quotes (x64dbg allows quoted paths)
+            if (a.size() >= 2 &&
+                ((a.startsWith('"') && a.endsWith('"')) ||
+                 (a.startsWith('\'') && a.endsWith('\''))))
+                a = a.mid(1, a.size() - 2);
+        }
     }
 
     auto log = [this](const QString& msg) {
