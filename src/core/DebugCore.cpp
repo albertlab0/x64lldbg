@@ -1215,43 +1215,61 @@ QString DebugCore::getStringAt(uint64_t address, int maxLen)
     size_t bytesRead = m_process.ReadMemory(address, buf.data(), maxLen, error);
     if (error.Fail() || bytesRead == 0) return QString();
 
-    // Check for printable ASCII/UTF-8 string (at least 4 chars)
+    // Check for printable ASCII string (x64dbg style: isprint || isspace only)
+    // Reject any byte >= 0x80 — those are not ASCII.
     int strLen = 0;
     for (size_t i = 0; i < bytesRead; i++) {
-        char c = buf[static_cast<int>(i)];
+        unsigned char c = static_cast<unsigned char>(buf[static_cast<int>(i)]);
         if (c == '\0') break;
-        if (c < 0x20 || c > 0x7E) {
-            // Allow common whitespace and UTF-8 continuation bytes (0x80-0xFF)
-            if (c != '\n' && c != '\r' && c != '\t' &&
-                (static_cast<unsigned char>(c) < 0x80))
-                return QString();
+        if ((c >= 0x20 && c <= 0x7E) || c == '\n' || c == '\r' || c == '\t')
+            strLen++;
+        else {
+            strLen = 0;
+            break;
         }
-        strLen++;
     }
 
-    if (strLen >= 4) {
-        return QString::fromUtf8(buf.data(), strLen);
+    if (strLen >= 2) {
+        return QString::fromLatin1(buf.data(), strLen);
     }
 
-    // Check for UTF-16LE (wide) string (at least 4 chars)
-    if (bytesRead >= 8) {
+    // Check for UTF-16LE (wide) string (at least 2 wchars)
+    // x64dbg: rejects surrogates, private use area, C1 controls, >= 0xFFF0
+    if (bytesRead >= 4) {
         int wcharLen = 0;
         const uint16_t* wbuf = reinterpret_cast<const uint16_t*>(buf.constData());
         size_t wcount = bytesRead / 2;
         for (size_t i = 0; i < wcount; i++) {
             uint16_t wc = wbuf[i];
             if (wc == 0) break;
-            // Printable BMP range (including common CJK, etc.)
-            if (wc >= 0x20 && (wc < 0xD800 || wc > 0xDFFF))
-                wcharLen++;
-            else if (wc == '\n' || wc == '\r' || wc == '\t')
-                wcharLen++;
-            else {
+            // Reject: control chars (non-printable ASCII range)
+            if (wc < 0x20 && wc != '\n' && wc != '\r' && wc != '\t') {
                 wcharLen = 0;
                 break;
             }
+            // Reject: C1 control chars (0x80-0x9F)
+            if (wc >= 0x80 && wc <= 0x9F) {
+                wcharLen = 0;
+                break;
+            }
+            // Reject: surrogates (0xD800-0xDFFF)
+            if (wc >= 0xD800 && wc <= 0xDFFF) {
+                wcharLen = 0;
+                break;
+            }
+            // Reject: private use area (0xE000-0xF8FF)
+            if (wc >= 0xE000 && wc <= 0xF8FF) {
+                wcharLen = 0;
+                break;
+            }
+            // Reject: >= 0xFFF0
+            if (wc >= 0xFFF0) {
+                wcharLen = 0;
+                break;
+            }
+            wcharLen++;
         }
-        if (wcharLen >= 4) {
+        if (wcharLen >= 2) {
             return QString::fromUtf16(reinterpret_cast<const char16_t*>(wbuf), wcharLen);
         }
     }
