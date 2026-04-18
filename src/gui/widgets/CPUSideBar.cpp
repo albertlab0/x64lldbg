@@ -58,9 +58,10 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
         jmp.isSelected = (line.address == m_selectedAddress);
         jmp.isAtIP = (line.address == pc);
 
-        if (jmp.isAtIP && jmp.isConditional)
+        // Evaluate taken/not-taken for jump at RIP or selected jump
+        if ((jmp.isAtIP || jmp.isSelected) && jmp.isConditional)
             jmp.isTaken = evaluateJumpTaken(line.mnemonic, rflags);
-        else if (jmp.isAtIP && !jmp.isConditional)
+        else if ((jmp.isAtIP || jmp.isSelected) && !jmp.isConditional)
             jmp.isTaken = true;  // unconditional jump is always taken
 
         uint64_t target = line.branchTarget;
@@ -193,10 +194,11 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
     QColor notTakenColor = ConfigColor("DisassemblyCommentColor");  // gray
 
     QPen pen;
-    if (jmp.isAtIP && !jmp.isTaken) {
-        // Jump at RIP but NOT taken: gray
+    if ((jmp.isAtIP || jmp.isSelected) && !jmp.isTaken) {
+        // Jump at RIP or selected, NOT taken: gray
         pen = QPen(notTakenColor, 2.0);
     } else if (jmp.isAtIP || jmp.isSelected) {
+        // Taken: red
         pen = QPen(selectedColor, 2.0);
     } else {
         pen = QPen(unselectedColor, 1.0);
@@ -275,19 +277,23 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
     int headerHeight = m_table->horizontalHeader()->height();
 
     // ── Draw jump arrows (background layer) ──
-    int arrowRightX = width() - 3;
+    int arrowRightX = width() - 8;  // keep arrows clear of opcode area
 
     QVector<JumpLine> jumps;
     collectJumps(jumps);
     allocateLanes(jumps);
 
-    // Draw non-selected jumps first, then selected on top
+    // Draw in 3 passes: normal → selected → isAtIP (highest priority on top)
     for (const auto& jmp : jumps) {
-        if (!jmp.isSelected)
+        if (!jmp.isSelected && !jmp.isAtIP)
             drawJump(painter, jmp, headerHeight, arrowRightX);
     }
     for (const auto& jmp : jumps) {
-        if (jmp.isSelected)
+        if (jmp.isSelected && !jmp.isAtIP)
+            drawJump(painter, jmp, headerHeight, arrowRightX);
+    }
+    for (const auto& jmp : jumps) {
+        if (jmp.isAtIP)
             drawJump(painter, jmp, headerHeight, arrowRightX);
     }
 
@@ -342,7 +348,7 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
 
             // Draw horizontal arrow line from label box to the right edge
             int arrowStartX = boxX + textWidth;
-            int arrowEndX = width() - 2;
+            int arrowEndX = width() - 8;
             int arrowY = y;
 
             QPen arrowPen(cipLabelBg, 2.0);
