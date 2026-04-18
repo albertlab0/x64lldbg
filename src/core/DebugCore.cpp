@@ -853,20 +853,7 @@ uint64_t DebugCore::currentPC()
 
 uint64_t DebugCore::currentRFLAGS()
 {
-#ifdef HAS_LLDB
-    if (!m_process.IsValid()) return 0;
-
-    lldb::SBThread thread = m_process.GetSelectedThread();
-    if (!thread.IsValid()) return 0;
-
-    lldb::SBFrame frame = thread.GetSelectedFrame();
-    if (!frame.IsValid()) return 0;
-
-    lldb::SBValue rflags = frame.FindRegister("rflags");
-    if (rflags.IsValid())
-        return rflags.GetValueAsUnsigned(0);
-#endif
-    return 0;
+    return m_cachedRFLAGS;
 }
 
 QVector<RegisterInfo> DebugCore::getRegisters()
@@ -910,6 +897,10 @@ QVector<RegisterInfo> DebugCore::getRegisters()
             RegisterInfo info;
             info.name = QString(reg.GetName()).toUpper();
             info.value = reg.GetValueAsUnsigned(0);
+
+            // Cache RFLAGS for sidebar jump evaluation
+            if (info.name == "RFLAGS")
+                m_cachedRFLAGS = info.value;
 
             // Check if changed from previous stop
             auto it = m_prevRegisters.find(info.name);

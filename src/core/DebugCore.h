@@ -228,6 +228,7 @@ private:
 
     // Previous register values for change detection
     QMap<QString, uint64_t> m_prevRegisters;
+    uint64_t m_cachedRFLAGS = 0;
 
     // User-defined labels (address → name)
     QMap<uint64_t, QString> m_labels;
