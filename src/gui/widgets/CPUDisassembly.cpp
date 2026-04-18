@@ -45,7 +45,8 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
             }
             emit addressSelected(m_lines[row].address);
         }
-        viewport()->update();
+        // Deferred full repaint to clear/redraw flow line after cell highlights settle
+        QTimer::singleShot(0, viewport(), QOverload<>::of(&QWidget::repaint));
     });
 }
 
