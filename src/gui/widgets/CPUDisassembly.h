@@ -48,6 +48,7 @@ private:
     DebugCore* m_debugCore;
     uint64_t m_baseAddress = 0;
     uint64_t m_gotoAddress = 0;  // user navigation highlight (Ctrl+G)
+    bool m_flowRepaintPending = false;  // guards against repaint loops
     QVector<DisassemblyLine> m_lines;
 
     // Column resize dragging (x64dbg-style, no visible header)

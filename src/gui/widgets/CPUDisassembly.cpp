@@ -45,9 +45,7 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
             }
             emit addressSelected(m_lines[row].address);
         }
-        // Schedule a FULL viewport repaint in the next event loop iteration
-        // so the jump flow line draws continuously (avoids partial repaint clipping)
-        QTimer::singleShot(0, viewport(), QOverload<>::of(&QWidget::update));
+        viewport()->update();
     });
 }
 
@@ -528,8 +526,8 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     QTableWidget::paintEvent(event);
 
     QPainter painter(viewport());
-    painter.setClipping(false);  // draw flow lines across entire viewport
     painter.setRenderHint(QPainter::Antialiasing, true);
+    bool isPartialRepaint = (event->rect() != viewport()->rect());
     int viewHeight = viewport()->height();
     int hScroll = horizontalScrollBar()->value();
 
@@ -657,6 +655,16 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
             QPoint(lineX + 3, destY + 2),
         };
         painter.drawPolyline(pts, 3);
+    }
+
+    // Flow line was drawn — if this was a partial repaint, the line is clipped.
+    // Schedule one full repaint to fix it.
+    if (isPartialRepaint && !m_flowRepaintPending) {
+        m_flowRepaintPending = true;
+        QTimer::singleShot(0, this, [this]() {
+            m_flowRepaintPending = false;
+            viewport()->repaint();
+        });
     }
 }
 
