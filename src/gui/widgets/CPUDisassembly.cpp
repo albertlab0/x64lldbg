@@ -321,7 +321,7 @@ void CPUDisassembly::rebuildTable()
             if (b > 0) bytesStr += ' ';
             bytesStr += QString("%1").arg(static_cast<uint8_t>(line.bytes[b]), 2, 16, QChar('0'));
         }
-        auto* bytesItem = new QTableWidgetItem(bytesStr.toUpper());
+        auto* bytesItem = new QTableWidgetItem("  " + bytesStr.toUpper());
         bytesItem->setForeground(bytesColor);
         setItem(i, 1, bytesItem);
 
@@ -547,10 +547,10 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     QColor arrowColor = ConfigColor("DisassemblyJumpArrowColor");
     int rowHeight = verticalHeader()->defaultSectionSize();
 
-    // X positions at the left edge of the Bytes column (before opcode text)
+    // X positions in the left margin of the Bytes column
     int bytesColLeft = columnWidth(0) - hScroll;
-    int smallArrowX = bytesColLeft + 3;   // small triangle indicators
-    int lineX       = bytesColLeft - 3;   // full flow line, left of opcode bytes
+    int smallArrowX = bytesColLeft + 6;   // small triangle indicators
+    int lineX       = bytesColLeft + 4;   // full flow line, in left margin of bytes col
 
     // ── 1. Small triangle indicators for ALL jump instructions ──
     for (int i = 0; i < m_lines.size(); i++) {
