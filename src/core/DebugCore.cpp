@@ -851,6 +851,24 @@ uint64_t DebugCore::currentPC()
     return 0;
 }
 
+uint64_t DebugCore::currentRFLAGS()
+{
+#ifdef HAS_LLDB
+    if (!m_process.IsValid()) return 0;
+
+    lldb::SBThread thread = m_process.GetSelectedThread();
+    if (!thread.IsValid()) return 0;
+
+    lldb::SBFrame frame = thread.GetSelectedFrame();
+    if (!frame.IsValid()) return 0;
+
+    lldb::SBValue rflags = frame.FindRegister("rflags");
+    if (rflags.IsValid())
+        return rflags.GetValueAsUnsigned(0);
+#endif
+    return 0;
+}
+
 QVector<RegisterInfo> DebugCore::getRegisters()
 {
     QVector<RegisterInfo> regs;

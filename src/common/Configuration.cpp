@@ -103,6 +103,7 @@ void Configuration::loadX64dbgDefaultColors()
     m_colors["SideBarBulletColor"]                 = QColor("#808080");
     m_colors["SideBarJumpLineColor"]               = QColor("#C0C0C0");
     m_colors["SideBarJumpSelectedColor"]           = QColor("#FF0000");
+    m_colors["SideBarJumpNotTakenColor"]           = QColor("#808080");
 
     m_colors["TableHeaderBackgroundColor"]         = QColor("#C0C0C0");
     m_colors["TableHeaderTextColor"]               = QColor("#000000");
@@ -185,6 +186,7 @@ void Configuration::loadModernLightColors()
     m_colors["SideBarBulletColor"]                 = QColor("#C0C0CA");
     m_colors["SideBarJumpLineColor"]               = QColor("#D0D0DA");
     m_colors["SideBarJumpSelectedColor"]           = QColor("#C03030");
+    m_colors["SideBarJumpNotTakenColor"]           = QColor("#909098");
 
     m_colors["TableHeaderBackgroundColor"]         = QColor("#F0F0F2");
     m_colors["TableHeaderTextColor"]               = QColor("#1A1A2E");
@@ -273,6 +275,7 @@ void Configuration::loadCutterDarkColors()
     m_colors["SideBarBulletColor"]                 = QColor("#4f5256");
     m_colors["SideBarJumpLineColor"]               = QColor("#4f5256");
     m_colors["SideBarJumpSelectedColor"]           = QColor("#e95656");
+    m_colors["SideBarJumpNotTakenColor"]           = QColor("#707478");
 
     // General chrome
     m_colors["TableHeaderBackgroundColor"]         = QColor("#2b2f32");

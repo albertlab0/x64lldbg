@@ -36,14 +36,8 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
     uint64_t lastAddr  = m_lines.last().address;
     uint64_t pc = m_debugCore->currentPC();
 
-    // Read RFLAGS once for evaluating the jump at RIP
-    uint64_t rflags = 0;
-    if (pc != 0) {
-        auto regs = m_debugCore->getRegisters();
-        for (const auto& r : regs) {
-            if (r.name == "RFLAGS") { rflags = r.value; break; }
-        }
-    }
+    // Read RFLAGS directly for evaluating conditional jumps
+    uint64_t rflags = m_debugCore->currentRFLAGS();
 
     for (int i = 0; i < m_lines.size(); i++) {
         const auto& line = m_lines[i];
@@ -91,38 +85,32 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
 
 bool CPUSideBar::evaluateJumpTaken(const QString& mnemonic, uint64_t rflags)
 {
-    // x86 RFLAGS bits
+    // x86 RFLAGS bits — matches CPUInfoBox::isJumpTaken exactly
     bool CF = (rflags >> 0) & 1;
     bool PF = (rflags >> 2) & 1;
     bool ZF = (rflags >> 6) & 1;
     bool SF = (rflags >> 7) & 1;
     bool OF = (rflags >> 11) & 1;
 
-    QString m = mnemonic.toLower();
-    // Strip trailing 'q' for 64-bit variants (e.g., jmpq, jeq)
-    if (m.endsWith('q') && m != "jnp")
-        m.chop(1);
+    // Use raw mnemonic (no stripping) — LLDB uses "jge" not "jgeq"
+    if (mnemonic == "jo")                                       return OF;
+    if (mnemonic == "jno")                                      return !OF;
+    if (mnemonic == "jb" || mnemonic == "jnae" || mnemonic == "jc")  return CF;
+    if (mnemonic == "jnb" || mnemonic == "jae" || mnemonic == "jnc") return !CF;
+    if (mnemonic == "jz" || mnemonic == "je")                   return ZF;
+    if (mnemonic == "jnz" || mnemonic == "jne")                 return !ZF;
+    if (mnemonic == "jbe" || mnemonic == "jna")                 return CF || ZF;
+    if (mnemonic == "jnbe" || mnemonic == "ja")                 return !CF && !ZF;
+    if (mnemonic == "js")                                       return SF;
+    if (mnemonic == "jns")                                      return !SF;
+    if (mnemonic == "jp" || mnemonic == "jpe")                  return PF;
+    if (mnemonic == "jnp" || mnemonic == "jpo")                 return !PF;
+    if (mnemonic == "jl" || mnemonic == "jnge")                 return SF != OF;
+    if (mnemonic == "jnl" || mnemonic == "jge")                 return SF == OF;
+    if (mnemonic == "jle" || mnemonic == "jng")                 return ZF || (SF != OF);
+    if (mnemonic == "jnle" || mnemonic == "jg")                 return !ZF && (SF == OF);
 
-    if (m == "je" || m == "jz")           return ZF;
-    if (m == "jne" || m == "jnz")         return !ZF;
-    if (m == "jg" || m == "jnle")         return !ZF && (SF == OF);
-    if (m == "jge" || m == "jnl")         return SF == OF;
-    if (m == "jl" || m == "jnge")         return SF != OF;
-    if (m == "jle" || m == "jng")         return ZF || (SF != OF);
-    if (m == "ja" || m == "jnbe")         return !CF && !ZF;
-    if (m == "jae" || m == "jnb" || m == "jnc") return !CF;
-    if (m == "jb" || m == "jnae" || m == "jc")  return CF;
-    if (m == "jbe" || m == "jna")         return CF || ZF;
-    if (m == "js")                        return SF;
-    if (m == "jns")                       return !SF;
-    if (m == "jo")                        return OF;
-    if (m == "jno")                       return !OF;
-    if (m == "jp" || m == "jpe")          return PF;
-    if (m == "jnp" || m == "jpo")         return !PF;
-    if (m == "jcxz" || m == "jecxz" || m == "jrcxz")
-        return false;  // can't evaluate without reading rcx
-
-    return false;  // unknown — assume not taken
+    return false;
 }
 
 // ── Lane allocation (prevents overlapping arrows) ───────────────────
@@ -191,7 +179,7 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
     // selected = bold red, unselected = thin muted
     QColor selectedColor = ConfigColor("SideBarJumpSelectedColor");
     QColor unselectedColor = ConfigColor("SideBarJumpLineColor");
-    QColor notTakenColor = ConfigColor("DisassemblyCommentColor");  // gray
+    QColor notTakenColor = ConfigColor("SideBarJumpNotTakenColor");
 
     QPen pen;
     if ((jmp.isAtIP || jmp.isSelected) && !jmp.isTaken) {

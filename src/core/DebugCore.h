@@ -155,6 +155,7 @@ public:
     // --- Data accessors ---
     ProcessState processState() const { return m_state; }
     uint64_t currentPC();
+    uint64_t currentRFLAGS();
     QVector<RegisterInfo> getRegisters();
     bool setRegister(const QString& name, uint64_t value);
     QByteArray readMemory(uint64_t address, size_t size);
