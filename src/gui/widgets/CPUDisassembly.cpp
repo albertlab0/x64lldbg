@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QInputDialog>
+#include <QTimer>
 #include "gui/dialogs/EditBreakpointDialog.h"
 #include "gui/widgets/CPUSideBar.h"
 
@@ -44,8 +45,9 @@ CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
             }
             emit addressSelected(m_lines[row].address);
         }
-        // Repaint viewport so inline flow line updates for new selection
-        viewport()->update();
+        // Schedule a FULL viewport repaint in the next event loop iteration
+        // so the jump flow line draws continuously (avoids partial repaint clipping)
+        QTimer::singleShot(0, viewport(), QOverload<>::of(&QWidget::update));
     });
 }
 
