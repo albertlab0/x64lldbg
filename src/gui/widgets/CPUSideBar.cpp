@@ -23,7 +23,11 @@ CPUSideBar::CPUSideBar(DebugCore* debugCore, QWidget* parent)
 
 void CPUSideBar::refresh()
 {
-    update();  // triggers repaint
+    // Cache register state so paintEvent uses consistent, current data.
+    // This is called via QueuedConnection after all register reads complete.
+    m_cachedPC = m_debugCore->currentPC();
+    m_cachedRFLAGS = m_debugCore->currentRFLAGS();
+    update();
 }
 
 // ── Jump data collection ────────────────────────────────────────────
@@ -34,10 +38,8 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
 
     uint64_t firstAddr = m_lines.first().address;
     uint64_t lastAddr  = m_lines.last().address;
-    uint64_t pc = m_debugCore->currentPC();
-
-    // Read RFLAGS directly for evaluating conditional jumps
-    uint64_t rflags = m_debugCore->currentRFLAGS();
+    uint64_t pc = m_cachedPC;
+    uint64_t rflags = m_cachedRFLAGS;
 
     for (int i = 0; i < m_lines.size(); i++) {
         const auto& line = m_lines[i];
@@ -55,10 +57,14 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
         // Evaluate taken/not-taken for jump at RIP or selected jump
         if ((jmp.isAtIP || jmp.isSelected) && jmp.isConditional) {
             jmp.isTaken = evaluateJumpTaken(line.mnemonic, rflags);
-            qDebug("[SideBar] Jump '%s' at 0x%llx: isAtIP=%d isSelected=%d rflags=0x%llx isTaken=%d",
-                   qPrintable(line.mnemonic), line.address,
-                   jmp.isAtIP, jmp.isSelected,
-                   rflags, jmp.isTaken);
+            emit m_debugCore->outputReceived(
+                QString("[SideBar] Jump '%1' at 0x%2: isAtIP=%3 isSelected=%4 rflags=0x%5 isTaken=%6")
+                .arg(line.mnemonic)
+                .arg(line.address, 0, 16)
+                .arg(jmp.isAtIP)
+                .arg(jmp.isSelected)
+                .arg(rflags, 0, 16)
+                .arg(jmp.isTaken));
         } else if ((jmp.isAtIP || jmp.isSelected) && !jmp.isConditional)
             jmp.isTaken = true;  // unconditional jump is always taken
 
@@ -255,7 +261,7 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
     if (m_rowHeight <= 0 || m_lines.isEmpty() || !m_table)
         return;
 
-    uint64_t pc = m_debugCore->currentPC();
+    uint64_t pc = m_cachedPC;
 
     // Get breakpoint addresses
     QSet<uint64_t> bpAddresses;

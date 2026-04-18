@@ -45,4 +45,6 @@ private:
     int m_rowHeight = 18;
     QVector<DisassemblyLine> m_lines;
     uint64_t m_selectedAddress = 0;
+    uint64_t m_cachedPC = 0;
+    uint64_t m_cachedRFLAGS = 0;
 };
