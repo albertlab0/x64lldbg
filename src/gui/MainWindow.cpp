@@ -295,8 +295,9 @@ void MainWindow::connectSignals()
             m_cpuWidget->getRegisters(), &CPURegistersView::refresh);
     connect(m_debugCore, &DebugCore::registersChanged,
             m_cpuWidget->getDisassembly(), &CPUDisassembly::refresh);
+    // Use QueuedConnection so sidebar repaints AFTER register values are read
     connect(m_debugCore, &DebugCore::registersChanged,
-            m_cpuWidget->getSideBar(), &CPUSideBar::refresh);
+            m_cpuWidget->getSideBar(), &CPUSideBar::refresh, Qt::QueuedConnection);
     connect(m_debugCore, &DebugCore::registersChanged,
             m_cpuWidget->getArguments(), &CPUArgumentWidget::refresh);
     connect(m_debugCore, &DebugCore::breakpointsChanged,
