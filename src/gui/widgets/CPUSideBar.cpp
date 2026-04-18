@@ -27,6 +27,7 @@ void CPUSideBar::refresh()
     // This is called via QueuedConnection after all register reads complete.
     m_cachedPC = m_debugCore->currentPC();
     m_cachedRFLAGS = m_debugCore->currentRFLAGS();
+    qDebug("[SideBar::refresh] cachedPC=0x%llx cachedRFLAGS=0x%llx", m_cachedPC, m_cachedRFLAGS);
     update();
 }
 
@@ -242,11 +243,16 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
 
 // ── Main paint ──────────────────────────────────────────────────────
 
+static int s_paintSeq = 0;
+
 void CPUSideBar::paintEvent(QPaintEvent* event)
 {
+    int seq = ++s_paintSeq;
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    qDebug("[SideBar::paint#%d] cachedPC=0x%llx cachedRFLAGS=0x%llx selectedAddr=0x%llx",
+           seq, m_cachedPC, m_cachedRFLAGS, m_selectedAddress);
 
     QColor bg = ConfigColor("SideBarBackgroundColor");
     QColor bulletColor = ConfigColor("SideBarBulletColor");
