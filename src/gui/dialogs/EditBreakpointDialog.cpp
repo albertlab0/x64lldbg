@@ -68,6 +68,33 @@ void EditBreakpointDialog::setupUI(const BreakpointInfo& bp)
     logLayout->addRow("Log Condition:", m_editLogCondition);
     mainLayout->addWidget(logGroup);
 
+    // Memory Dump
+    auto* dumpGroup = new QGroupBox("Memory Dump on Hit");
+    auto* dumpLayout = new QFormLayout(dumpGroup);
+    auto* dumpHint = new QLabel(
+        "Dump memory to file each time breakpoint is hit.\n"
+        "Use {HitCount} in filename for separate files per hit.\n"
+        "Static filename = append all hits to one file.");
+    dumpHint->setWordWrap(true);
+    dumpHint->setStyleSheet("color: #888;");
+    dumpLayout->addRow(dumpHint);
+
+    m_editDumpAddress = new QLineEdit(bp.dumpAddress);
+    m_editDumpAddress->setPlaceholderText("e.g., rsi (register or expression for address)");
+    m_editDumpAddress->setFont(ConfigFont("Disassembly"));
+    dumpLayout->addRow("Address:", m_editDumpAddress);
+
+    m_editDumpSize = new QLineEdit(bp.dumpSize);
+    m_editDumpSize->setPlaceholderText("e.g., rdx (register or expression for size)");
+    m_editDumpSize->setFont(ConfigFont("Disassembly"));
+    dumpLayout->addRow("Size:", m_editDumpSize);
+
+    m_editDumpFilename = new QLineEdit(bp.dumpFilename);
+    m_editDumpFilename->setPlaceholderText("e.g., /tmp/dump_{HitCount}.bin or /tmp/dump_all.bin");
+    m_editDumpFilename->setFont(ConfigFont("Disassembly"));
+    dumpLayout->addRow("Filename:", m_editDumpFilename);
+    mainLayout->addWidget(dumpGroup);
+
     // Options
     m_checkFastResume = new QCheckBox("Fast Resume (log only, do not break)");
     m_checkFastResume->setChecked(bp.fastResume);
@@ -107,4 +134,19 @@ QString EditBreakpointDialog::logCondition() const
 bool EditBreakpointDialog::fastResume() const
 {
     return m_checkFastResume->isChecked();
+}
+
+QString EditBreakpointDialog::dumpAddress() const
+{
+    return m_editDumpAddress->text().trimmed();
+}
+
+QString EditBreakpointDialog::dumpSize() const
+{
+    return m_editDumpSize->text().trimmed();
+}
+
+QString EditBreakpointDialog::dumpFilename() const
+{
+    return m_editDumpFilename->text().trimmed();
 }

@@ -18,6 +18,9 @@ public:
     QString logText() const;
     QString logCondition() const;
     bool fastResume() const;
+    QString dumpAddress() const;
+    QString dumpSize() const;
+    QString dumpFilename() const;
 
 private:
     void setupUI(const BreakpointInfo& bp);
@@ -27,4 +30,7 @@ private:
     QLineEdit* m_editLogText;
     QLineEdit* m_editLogCondition;
     QCheckBox* m_checkFastResume;
+    QLineEdit* m_editDumpAddress;
+    QLineEdit* m_editDumpSize;
+    QLineEdit* m_editDumpFilename;
 };

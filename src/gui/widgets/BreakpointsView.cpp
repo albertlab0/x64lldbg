@@ -118,6 +118,8 @@ void BreakpointsView::editBreakpointAt(int row)
         m_debugCore->setBreakpointLogText(bp.id, dlg.logText());
         m_debugCore->setBreakpointLogCondition(bp.id, dlg.logCondition());
         m_debugCore->setBreakpointFastResume(bp.id, dlg.fastResume());
+        m_debugCore->setBreakpointDump(bp.id, dlg.dumpAddress(),
+                                        dlg.dumpSize(), dlg.dumpFilename());
     }
 }
 

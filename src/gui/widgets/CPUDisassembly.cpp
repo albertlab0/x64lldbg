@@ -890,5 +890,7 @@ void CPUDisassembly::promptEditBreakpoint()
         m_debugCore->setBreakpointLogText(bpInfo.id, dlg.logText());
         m_debugCore->setBreakpointLogCondition(bpInfo.id, dlg.logCondition());
         m_debugCore->setBreakpointFastResume(bpInfo.id, dlg.fastResume());
+        m_debugCore->setBreakpointDump(bpInfo.id, dlg.dumpAddress(),
+                                        dlg.dumpSize(), dlg.dumpFilename());
     }
 }

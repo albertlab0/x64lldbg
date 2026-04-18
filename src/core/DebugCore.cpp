@@ -745,6 +745,9 @@ QVector<BreakpointInfo> DebugCore::getBreakpoints() const
             info.logText = extra.logText;
             info.logCondition = extra.logCondition;
             info.fastResume = extra.fastResume;
+            info.dumpAddress = extra.dumpAddress;
+            info.dumpSize = extra.dumpSize;
+            info.dumpFilename = extra.dumpFilename;
         }
 
         result.append(info);
@@ -784,6 +787,15 @@ void DebugCore::setBreakpointLogCondition(uint32_t id, const QString& logConditi
 void DebugCore::setBreakpointFastResume(uint32_t id, bool fastResume)
 {
     m_bpExtras[id].fastResume = fastResume;
+    emit breakpointsChanged();
+}
+
+void DebugCore::setBreakpointDump(uint32_t id, const QString& address,
+                                   const QString& size, const QString& filename)
+{
+    m_bpExtras[id].dumpAddress = address;
+    m_bpExtras[id].dumpSize = size;
+    m_bpExtras[id].dumpFilename = filename;
     emit breakpointsChanged();
 }
 
@@ -1590,6 +1602,56 @@ bool DebugCore::handleBreakpointLog(uint64_t address)
         if (shouldLog && !extra.logText.isEmpty()) {
             QString formatted = formatLogText(extra.logText);
             emit outputReceived(QString("[BP %1] %2").arg(id).arg(formatted));
+        }
+
+        // Memory dump on hit
+        if (!extra.dumpAddress.isEmpty() && !extra.dumpSize.isEmpty()
+            && !extra.dumpFilename.isEmpty()) {
+            // Resolve address and size expressions
+            QString addrStr = formatExpression(extra.dumpAddress);
+            QString sizeStr = formatExpression(extra.dumpSize);
+            bool addrOk = false, sizeOk = false;
+            uint64_t dumpAddr = addrStr.toULongLong(&addrOk, 16);
+            // formatExpression returns "0xNNN" for registers
+            if (!addrOk && addrStr.startsWith("0x"))
+                dumpAddr = addrStr.mid(2).toULongLong(&addrOk, 16);
+            uint64_t dumpSize = sizeStr.toULongLong(&sizeOk, 16);
+            if (!sizeOk && sizeStr.startsWith("0x"))
+                dumpSize = sizeStr.mid(2).toULongLong(&sizeOk, 16);
+            // Also try decimal
+            if (!sizeOk)
+                dumpSize = sizeStr.toULongLong(&sizeOk, 10);
+
+            if (addrOk && sizeOk && dumpSize > 0) {
+                QByteArray data = readMemory(dumpAddr, static_cast<size_t>(dumpSize));
+
+                // Expand filename pattern: {HitCount} and register placeholders
+                uint32_t hitCount = bp.GetHitCount();
+                QString filename = extra.dumpFilename;
+                filename.replace("{HitCount}", QString::number(hitCount));
+                // Expand any remaining {register} patterns
+                filename = formatLogText(filename);
+
+                // If filename contains dynamic part (was different), overwrite.
+                // If static filename, append.
+                bool isDynamic = extra.dumpFilename.contains("{HitCount}") ||
+                                 extra.dumpFilename.contains("{");
+                QFile file(filename);
+                QIODevice::OpenMode mode = isDynamic
+                    ? (QIODevice::WriteOnly | QIODevice::Truncate)
+                    : (QIODevice::WriteOnly | QIODevice::Append);
+                if (file.open(mode)) {
+                    file.write(data);
+                    file.close();
+                    if (shouldLog) {
+                        emit outputReceived(QString("[BP %1] Dumped %2 bytes → %3")
+                            .arg(id).arg(data.size()).arg(filename));
+                    }
+                } else {
+                    emit outputReceived(QString("[BP %1] Dump FAILED: %2")
+                        .arg(id).arg(file.errorString()));
+                }
+            }
         }
 
         // Fast resume: skip breaking, just continue

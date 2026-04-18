@@ -47,6 +47,10 @@ struct BreakpointInfo {
     QString logText;         // log message with {register} placeholders
     QString logCondition;    // expression: log only when true (empty = always)
     bool fastResume = false; // skip break, just log and continue
+    // Memory dump on hit
+    QString dumpAddress;     // expression for start address (e.g., "rsi")
+    QString dumpSize;        // expression for byte count (e.g., "rdx")
+    QString dumpFilename;    // filename pattern with {HitCount}, {register} support
 };
 
 struct MemoryRegion {
@@ -145,6 +149,7 @@ public:
     void setBreakpointLogCondition(uint32_t id, const QString& logCondition);
     void setBreakpointCondition(uint32_t id, const QString& condition);
     void setBreakpointFastResume(uint32_t id, bool fastResume);
+    void setBreakpointDump(uint32_t id, const QString& address, const QString& size, const QString& filename);
     QString formatLogText(const QString& logText);  // expand {register} placeholders
 
     // --- Data accessors ---
@@ -230,6 +235,10 @@ private:
         QString logText;
         QString logCondition;
         bool fastResume = false;
+        // Memory dump on hit
+        QString dumpAddress;   // expression for start address (e.g., "rsi")
+        QString dumpSize;      // expression for byte count (e.g., "rdx")
+        QString dumpFilename;  // pattern: supports {HitCount}, {rax}, etc.
     };
     QMap<uint32_t, BpExtra> m_bpExtras;
 
