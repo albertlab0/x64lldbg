@@ -14,9 +14,9 @@ public:
     explicit CPUSideBar(DebugCore* debugCore, QWidget* parent = nullptr);
 
     void setRowHeight(int height) { m_rowHeight = height; update(); }
-    void setLines(const QVector<DisassemblyLine>& lines) { m_lines = lines; qDebug("[SideBar::setLines] %d lines, cachedPC=0x%llx", m_lines.size(), m_cachedPC); update(); }
+    void setLines(const QVector<DisassemblyLine>& lines) { m_lines = lines; update(); }
     void setTableWidget(QTableWidget* table) { m_table = table; }
-    void setSelectedAddress(uint64_t addr) { m_selectedAddress = addr; qDebug("[SideBar::setSelectedAddr] addr=0x%llx cachedPC=0x%llx", addr, m_cachedPC); update(); }
+    void setSelectedAddress(uint64_t addr) { m_selectedAddress = addr; update(); }
 
 public slots:
     void refresh();

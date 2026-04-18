@@ -526,6 +526,7 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     QTableWidget::paintEvent(event);
 
     QPainter painter(viewport());
+    painter.setClipping(false);  // draw flow lines across entire viewport
     painter.setRenderHint(QPainter::Antialiasing, true);
     int viewHeight = viewport()->height();
     int hScroll = horizontalScrollBar()->value();

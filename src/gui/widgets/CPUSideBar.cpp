@@ -27,7 +27,6 @@ void CPUSideBar::refresh()
     // This is called via QueuedConnection after all register reads complete.
     m_cachedPC = m_debugCore->currentPC();
     m_cachedRFLAGS = m_debugCore->currentRFLAGS();
-    qDebug("[SideBar::refresh] cachedPC=0x%llx cachedRFLAGS=0x%llx", m_cachedPC, m_cachedRFLAGS);
     update();
 }
 
@@ -193,23 +192,13 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
     QColor notTakenColor = ConfigColor("SideBarJumpNotTakenColor");
 
     QPen pen;
-    const char* colorName = "default";
     if ((jmp.isAtIP || jmp.isSelected) && !jmp.isTaken) {
-        // Jump at RIP or selected, NOT taken: gray
         pen = QPen(notTakenColor, 2.0);
-        colorName = "GRAY(not-taken)";
     } else if (jmp.isAtIP || jmp.isSelected) {
-        // Taken: red
         pen = QPen(selectedColor, 2.0);
-        colorName = "RED(taken)";
     } else {
         pen = QPen(unselectedColor, 1.0);
-        colorName = "default(unselected)";
     }
-    if (jmp.isAtIP || jmp.isSelected)
-        qDebug("[SideBar::drawJump] row=%d %s isAtIP=%d isSel=%d isTaken=%d color=%s",
-               jmp.srcRow, colorName, jmp.isAtIP, jmp.isSelected, jmp.isTaken,
-               qPrintable(pen.color().name()));
     if (jmp.isConditional)
         pen.setStyle(Qt::DashLine);
     else
@@ -251,16 +240,11 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
 
 // ── Main paint ──────────────────────────────────────────────────────
 
-static int s_paintSeq = 0;
-
 void CPUSideBar::paintEvent(QPaintEvent* event)
 {
-    int seq = ++s_paintSeq;
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    qDebug("[SideBar::paint#%d] cachedPC=0x%llx cachedRFLAGS=0x%llx selectedAddr=0x%llx",
-           seq, m_cachedPC, m_cachedRFLAGS, m_selectedAddress);
 
     QColor bg = ConfigColor("SideBarBackgroundColor");
     QColor bulletColor = ConfigColor("SideBarBulletColor");
