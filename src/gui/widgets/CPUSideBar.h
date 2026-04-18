@@ -31,11 +31,14 @@ private:
         int lane = 0;
         bool isConditional;
         bool isSelected;
+        bool isAtIP = false;   // this jump is at the current instruction pointer
+        bool isTaken = false;  // conditional jump will be taken (based on RFLAGS)
     };
 
     void collectJumps(QVector<JumpLine>& jumps);
     void allocateLanes(QVector<JumpLine>& jumps);
     void drawJump(QPainter& painter, const JumpLine& jmp, int headerHeight, int arrowRightX);
+    static bool evaluateJumpTaken(const QString& mnemonic, uint64_t rflags);
 
     DebugCore* m_debugCore;
     QTableWidget* m_table = nullptr;

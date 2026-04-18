@@ -13,9 +13,13 @@ public:
 public slots:
     void refresh();
 
+signals:
+    void registerChanged(const QString& name, uint64_t newValue);
+
 private:
     void setupColumns();
     void applyStyle();
+    void editRegisterAt(int row);
 
     DebugCore* m_debugCore;
 };

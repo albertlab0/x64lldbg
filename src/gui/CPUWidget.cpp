@@ -46,6 +46,14 @@ CPUWidget::CPUWidget(DebugCore* debugCore, QWidget* parent)
     // Highlight selected instruction's jump arrow in the sidebar
     connect(m_disassembly, &CPUDisassembly::addressSelected,
             m_sideBar, &CPUSideBar::setSelectedAddress);
+
+    // When a register is edited, navigate disassembly if RIP changed
+    connect(m_registers, &CPURegistersView::registerChanged,
+            this, [this](const QString& name, uint64_t newValue) {
+        if (name.compare("RIP", Qt::CaseInsensitive) == 0) {
+            m_disassembly->goToAddress(newValue);
+        }
+    });
 }
 
 void CPUWidget::setupLayout()

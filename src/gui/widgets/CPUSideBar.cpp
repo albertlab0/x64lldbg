@@ -2,6 +2,7 @@
 #include "common/Configuration.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 #include <QSet>
 #include <QTableWidget>
@@ -33,6 +34,16 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
 
     uint64_t firstAddr = m_lines.first().address;
     uint64_t lastAddr  = m_lines.last().address;
+    uint64_t pc = m_debugCore->currentPC();
+
+    // Read RFLAGS once for evaluating the jump at RIP
+    uint64_t rflags = 0;
+    if (pc != 0) {
+        auto regs = m_debugCore->getRegisters();
+        for (const auto& r : regs) {
+            if (r.name == "RFLAGS") { rflags = r.value; break; }
+        }
+    }
 
     for (int i = 0; i < m_lines.size(); i++) {
         const auto& line = m_lines[i];
@@ -45,6 +56,12 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
         jmp.srcRow = i;
         jmp.isConditional = (line.mnemonic != "jmp" && line.mnemonic != "jmpq");
         jmp.isSelected = (line.address == m_selectedAddress);
+        jmp.isAtIP = (line.address == pc);
+
+        if (jmp.isAtIP && jmp.isConditional)
+            jmp.isTaken = evaluateJumpTaken(line.mnemonic, rflags);
+        else if (jmp.isAtIP && !jmp.isConditional)
+            jmp.isTaken = true;  // unconditional jump is always taken
 
         uint64_t target = line.branchTarget;
 
@@ -69,6 +86,42 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
 
         jumps.append(jmp);
     }
+}
+
+bool CPUSideBar::evaluateJumpTaken(const QString& mnemonic, uint64_t rflags)
+{
+    // x86 RFLAGS bits
+    bool CF = (rflags >> 0) & 1;
+    bool PF = (rflags >> 2) & 1;
+    bool ZF = (rflags >> 6) & 1;
+    bool SF = (rflags >> 7) & 1;
+    bool OF = (rflags >> 11) & 1;
+
+    QString m = mnemonic.toLower();
+    // Strip trailing 'q' for 64-bit variants (e.g., jmpq, jeq)
+    if (m.endsWith('q') && m != "jnp")
+        m.chop(1);
+
+    if (m == "je" || m == "jz")           return ZF;
+    if (m == "jne" || m == "jnz")         return !ZF;
+    if (m == "jg" || m == "jnle")         return !ZF && (SF == OF);
+    if (m == "jge" || m == "jnl")         return SF == OF;
+    if (m == "jl" || m == "jnge")         return SF != OF;
+    if (m == "jle" || m == "jng")         return ZF || (SF != OF);
+    if (m == "ja" || m == "jnbe")         return !CF && !ZF;
+    if (m == "jae" || m == "jnb" || m == "jnc") return !CF;
+    if (m == "jb" || m == "jnae" || m == "jc")  return CF;
+    if (m == "jbe" || m == "jna")         return CF || ZF;
+    if (m == "js")                        return SF;
+    if (m == "jns")                       return !SF;
+    if (m == "jo")                        return OF;
+    if (m == "jno")                       return !OF;
+    if (m == "jp" || m == "jpe")          return PF;
+    if (m == "jnp" || m == "jpo")         return !PF;
+    if (m == "jcxz" || m == "jecxz" || m == "jrcxz")
+        return false;  // can't evaluate without reading rcx
+
+    return false;  // unknown — assume not taken
 }
 
 // ── Lane allocation (prevents overlapping arrows) ───────────────────
@@ -133,12 +186,17 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
         destY += m_rowHeight / 4;
     }
 
-    // Set pen: selected = bold red, unselected = thin muted
+    // Set pen: at-IP-taken = bold red, at-IP-not-taken = gray,
+    // selected = bold red, unselected = thin muted
     QColor selectedColor = ConfigColor("SideBarJumpSelectedColor");
     QColor unselectedColor = ConfigColor("SideBarJumpLineColor");
+    QColor notTakenColor = ConfigColor("DisassemblyCommentColor");  // gray
 
     QPen pen;
-    if (jmp.isSelected) {
+    if (jmp.isAtIP && !jmp.isTaken) {
+        // Jump at RIP but NOT taken: gray
+        pen = QPen(notTakenColor, 2.0);
+    } else if (jmp.isAtIP || jmp.isSelected) {
         pen = QPen(selectedColor, 2.0);
     } else {
         pen = QPen(unselectedColor, 1.0);
@@ -150,39 +208,33 @@ void CPUSideBar::drawJump(QPainter& painter, const JumpLine& jmp,
 
     painter.setPen(pen);
 
-    // Draw: source horizontal → vertical → dest horizontal + arrowhead
-    // Source row: horizontal from right edge to lane
-    painter.drawLine(arrowRightX, srcY, laneX, srcY);
+    // Draw the arrow body as a single path so the dash pattern is continuous
+    QPainterPath path;
+    path.moveTo(arrowRightX, srcY);
+    path.lineTo(laneX, srcY);
+    path.lineTo(laneX, destY);
+    if (!destOffTop && !destOffBot)
+        path.lineTo(arrowRightX, destY);
+    painter.drawPath(path);
 
-    // Vertical connecting line
-    painter.drawLine(laneX, srcY, laneX, destY);
+    // Arrowhead (always solid)
+    QPen arrowPen = pen;
+    arrowPen.setStyle(Qt::SolidLine);
+    painter.setPen(arrowPen);
 
     if (!destOffTop && !destOffBot) {
-        // Destination row: horizontal from lane to right edge
-        painter.drawLine(laneX, destY, arrowRightX, destY);
-
         // Arrowhead pointing right (toward disassembly)
         int sz = 4;
-        // Use solid pen for arrowhead even on dashed lines
-        QPen arrowPen = pen;
-        arrowPen.setStyle(Qt::SolidLine);
-        painter.setPen(arrowPen);
         painter.drawLine(arrowRightX, destY, arrowRightX - sz, destY - sz);
         painter.drawLine(arrowRightX, destY, arrowRightX - sz, destY + sz);
     } else if (destOffTop) {
         // Arrow pointing up at top edge
         int sz = 3;
-        QPen arrowPen = pen;
-        arrowPen.setStyle(Qt::SolidLine);
-        painter.setPen(arrowPen);
         painter.drawLine(laneX, destY, laneX - sz, destY + sz + 1);
         painter.drawLine(laneX, destY, laneX + sz, destY + sz + 1);
     } else {
         // Arrow pointing down at bottom edge
         int sz = 3;
-        QPen arrowPen = pen;
-        arrowPen.setStyle(Qt::SolidLine);
-        painter.setPen(arrowPen);
         painter.drawLine(laneX, destY, laneX - sz, destY - sz - 1);
         painter.drawLine(laneX, destY, laneX + sz, destY - sz - 1);
     }

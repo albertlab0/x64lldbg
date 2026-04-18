@@ -22,7 +22,10 @@ private:
     void setupColumns();
     void populate();
     void applyStyle();
+    void editByteAt(int row, int col);
+    void editBytesDialog();
     void paintEvent(QPaintEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
     DebugCore* m_debugCore;
     uint64_t m_baseAddress = 0;  // 0 = empty until debugger provides an address

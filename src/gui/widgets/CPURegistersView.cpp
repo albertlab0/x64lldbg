@@ -2,6 +2,7 @@
 #include "common/Configuration.h"
 
 #include <QHeaderView>
+#include <QInputDialog>
 
 CPURegistersView::CPURegistersView(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -10,6 +11,10 @@ CPURegistersView::CPURegistersView(DebugCore* debugCore, QWidget* parent)
     setupColumns();
     applyStyle();
     refresh();
+
+    connect(this, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
+        editRegisterAt(row);
+    });
 }
 
 void CPURegistersView::setupColumns()
@@ -81,5 +86,37 @@ void CPURegistersView::refresh()
         auto* refItem = new QTableWidgetItem(deref);
         refItem->setForeground(deref.startsWith('"') ? strRefColor : symRefColor);
         setItem(i, 2, refItem);
+    }
+}
+
+void CPURegistersView::editRegisterAt(int row)
+{
+    auto* nameItem = item(row, 0);
+    auto* valueItem = item(row, 1);
+    if (!nameItem || !valueItem) return;
+
+    QString regName = nameItem->text();
+    QString currentValue = valueItem->text();
+
+    bool ok;
+    QString newValue = QInputDialog::getText(this,
+        QString("Set %1").arg(regName),
+        QString("New value for %1:").arg(regName),
+        QLineEdit::Normal, currentValue, &ok);
+
+    if (!ok || newValue.trimmed().isEmpty()) return;
+
+    // Parse as hex (strip optional 0x prefix)
+    QString stripped = newValue.trimmed();
+    if (stripped.startsWith("0x", Qt::CaseInsensitive))
+        stripped = stripped.mid(2);
+
+    bool parseOk;
+    uint64_t val = stripped.toULongLong(&parseOk, 16);
+    if (!parseOk) return;
+
+    if (m_debugCore->setRegister(regName, val)) {
+        refresh();
+        emit registerChanged(regName, val);
     }
 }

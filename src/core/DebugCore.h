@@ -156,6 +156,7 @@ public:
     ProcessState processState() const { return m_state; }
     uint64_t currentPC();
     QVector<RegisterInfo> getRegisters();
+    bool setRegister(const QString& name, uint64_t value);
     QByteArray readMemory(uint64_t address, size_t size);
     bool writeMemory(uint64_t address, const QByteArray& data);
     QVector<StackEntry> getStackEntries(int count = 32);

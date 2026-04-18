@@ -6,6 +6,10 @@
 #include <QPainter>
 #include <QStackedWidget>
 #include <QScrollBar>
+#include <QInputDialog>
+#include <QKeyEvent>
+#include <QMenu>
+#include <QRegularExpression>
 
 // ============================================================
 //  CPUDumpView — single hex dump table
@@ -20,6 +24,23 @@ CPUDumpView::CPUDumpView(DebugCore* debugCore, QWidget* parent)
     // Start empty — hide header and columns until debugger provides an address
     horizontalHeader()->setVisible(false);
     setColumnCount(0);
+
+    // Double-click a hex byte cell to edit
+    connect(this, &QTableWidget::cellDoubleClicked, this, [this](int row, int col) {
+        if (col >= 1 && col <= 16)
+            editByteAt(row, col);
+    });
+
+    // Context menu
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        if (m_baseAddress == 0) return;
+        QMenu menu(this);
+        auto* editAction = menu.addAction("Edit Bytes...");
+        editAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+        connect(editAction, &QAction::triggered, this, &CPUDumpView::editBytesDialog);
+        menu.exec(viewport()->mapToGlobal(pos));
+    });
 }
 
 void CPUDumpView::setupColumns()
@@ -130,6 +151,94 @@ void CPUDumpView::populate()
         asciiItem->setForeground(asciiColor);
         setItem(row, 17, asciiItem);
     }
+}
+
+void CPUDumpView::editByteAt(int row, int col)
+{
+    if (m_baseAddress == 0 || col < 1 || col > 16) return;
+
+    uint64_t addr = m_baseAddress + row * 16 + (col - 1);
+    auto* hexItem = item(row, col);
+    if (!hexItem) return;
+
+    bool ok;
+    QString newVal = QInputDialog::getText(this,
+        QString("Edit Byte at 0x%1").arg(addr, 0, 16),
+        "Hex value (1 byte):",
+        QLineEdit::Normal, hexItem->text(), &ok);
+
+    if (!ok || newVal.trimmed().isEmpty()) return;
+
+    QString stripped = newVal.trimmed();
+    if (stripped.startsWith("0x", Qt::CaseInsensitive))
+        stripped = stripped.mid(2);
+
+    bool parseOk;
+    uint val = stripped.toUInt(&parseOk, 16);
+    if (!parseOk || val > 0xFF) return;
+
+    QByteArray data;
+    data.append(static_cast<char>(val));
+    if (m_debugCore->writeMemory(addr, data))
+        refresh();
+}
+
+void CPUDumpView::editBytesDialog()
+{
+    if (m_baseAddress == 0) return;
+
+    // Use selected cell address if available, else base address
+    uint64_t addr = m_baseAddress;
+    auto sel = selectedItems();
+    if (!sel.isEmpty()) {
+        int row = sel.first()->row();
+        int col = sel.first()->column();
+        if (col >= 1 && col <= 16)
+            addr = m_baseAddress + row * 16 + (col - 1);
+        else
+            addr = m_baseAddress + row * 16;
+    }
+
+    bool ok;
+    QString addrStr = QInputDialog::getText(this,
+        "Edit Memory",
+        "Address (hex):",
+        QLineEdit::Normal, QString("0x%1").arg(addr, 0, 16), &ok);
+    if (!ok || addrStr.trimmed().isEmpty()) return;
+
+    QString stripped = addrStr.trimmed();
+    if (stripped.startsWith("0x", Qt::CaseInsensitive))
+        stripped = stripped.mid(2);
+    uint64_t targetAddr = stripped.toULongLong(&ok, 16);
+    if (!ok) return;
+
+    QString bytesStr = QInputDialog::getText(this,
+        QString("Edit Memory at 0x%1").arg(targetAddr, 0, 16),
+        "Hex bytes (e.g., 90 90 CC 48 89):",
+        QLineEdit::Normal, QString(), &ok);
+    if (!ok || bytesStr.trimmed().isEmpty()) return;
+
+    // Parse space-separated hex bytes
+    QByteArray data;
+    QStringList tokens = bytesStr.trimmed().split(QRegularExpression("\\s+"));
+    for (const QString& token : tokens) {
+        bool byteOk;
+        uint byte = token.toUInt(&byteOk, 16);
+        if (!byteOk || byte > 0xFF) return;
+        data.append(static_cast<char>(byte));
+    }
+
+    if (!data.isEmpty() && m_debugCore->writeMemory(targetAddr, data))
+        refresh();
+}
+
+void CPUDumpView::keyPressEvent(QKeyEvent* event)
+{
+    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_E) {
+        editBytesDialog();
+        return;
+    }
+    QTableWidget::keyPressEvent(event);
 }
 
 void CPUDumpView::paintEvent(QPaintEvent* event)

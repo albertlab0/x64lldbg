@@ -909,6 +909,27 @@ QVector<RegisterInfo> DebugCore::getRegisters()
     return regs;
 }
 
+bool DebugCore::setRegister(const QString& name, uint64_t value)
+{
+#ifdef HAS_LLDB
+    if (!m_process.IsValid()) return false;
+
+    // Use "register write" command — works for all register types
+    QString cmd = QString("register write %1 0x%2")
+        .arg(name.toLower())
+        .arg(value, 0, 16);
+    QString output, error;
+    bool ok = executeCommand(cmd, output, error);
+    if (ok) {
+        emit registersChanged();
+    }
+    return ok;
+#else
+    Q_UNUSED(name); Q_UNUSED(value);
+    return false;
+#endif
+}
+
 QByteArray DebugCore::readMemory(uint64_t address, size_t size)
 {
 #ifdef HAS_LLDB
