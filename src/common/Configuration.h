@@ -6,6 +6,7 @@
 #include <QKeySequence>
 #include <QMap>
 #include <QString>
+#include <wordexp.h>
 
 struct Shortcut {
     QString name;
@@ -70,3 +71,16 @@ private:
 #define Config() (Configuration::instance())
 #define ConfigColor(x) (Config()->getColor(x))
 #define ConfigFont(x) (Config()->getFont(x))
+
+// Expand ~, ~user, $ENV using POSIX wordexp (no command substitution)
+inline QString expandPath(const QString& path)
+{
+    QByteArray utf8 = path.toUtf8();
+    wordexp_t we;
+    if (wordexp(utf8.constData(), &we, WRDE_NOCMD) == 0 && we.we_wordc > 0) {
+        QString result = QString::fromUtf8(we.we_wordv[0]);
+        wordfree(&we);
+        return result;
+    }
+    return path;
+}

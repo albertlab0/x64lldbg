@@ -1,4 +1,5 @@
 #include "DebugCore.h"
+#include "common/Configuration.h"
 #include <QTimer>
 #include <QFile>
 #include <QProcess>
@@ -1683,6 +1684,8 @@ bool DebugCore::handleBreakpointLog(uint64_t address)
                 filename.replace("{HitCount}", QString::number(hitCount));
                 // Expand any remaining {register} patterns
                 filename = formatLogText(filename);
+
+                filename = expandPath(filename);
 
                 // If filename contains dynamic part (was different), overwrite.
                 // If static filename, append.

@@ -151,6 +151,8 @@ void CommandLineEdit::executeCommand(const QString& cmd)
                 .arg(size);
         }
 
+        filename = expandPath(filename);
+
         QByteArray data = m_debugCore->readMemory(addr, static_cast<size_t>(size));
         if (data.isEmpty()) {
             log(QString("[cmd] Failed to read memory at 0x%1").arg(addr, 0, 16));
