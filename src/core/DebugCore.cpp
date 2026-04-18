@@ -853,7 +853,29 @@ uint64_t DebugCore::currentPC()
 
 uint64_t DebugCore::currentRFLAGS()
 {
-    return m_cachedRFLAGS;
+#ifdef HAS_LLDB
+    if (!m_process.IsValid()) return 0;
+
+    lldb::SBThread thread = m_process.GetSelectedThread();
+    if (!thread.IsValid()) return 0;
+
+    lldb::SBFrame frame = thread.GetSelectedFrame();
+    if (!frame.IsValid()) return 0;
+
+    // Read directly from LLDB (no caching) to avoid stale values
+    lldb::SBValueList regSets = frame.GetRegisters();
+    for (uint32_t i = 0; i < regSets.GetSize(); i++) {
+        lldb::SBValue regSet = regSets.GetValueAtIndex(i);
+        if (!QString(regSet.GetName()).toLower().contains("general"))
+            continue;
+        for (uint32_t j = 0; j < regSet.GetNumChildren(); j++) {
+            lldb::SBValue reg = regSet.GetChildAtIndex(j);
+            if (QString(reg.GetName()).toLower() == "rflags")
+                return reg.GetValueAsUnsigned(0);
+        }
+    }
+#endif
+    return 0;
 }
 
 QVector<RegisterInfo> DebugCore::getRegisters()
