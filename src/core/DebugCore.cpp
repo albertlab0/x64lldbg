@@ -1699,6 +1699,17 @@ void DebugCore::onProcessStopped()
 
             lldb::SBFrame frame = thread.GetSelectedFrame();
             uint64_t pc = frame.IsValid() ? frame.GetPC() : 0;
+
+            // Check fast-resume breakpoints BEFORE any UI refresh
+            if (reason == lldb::eStopReasonBreakpoint) {
+                bool shouldResume = handleBreakpointLog(pc);
+                if (shouldResume) {
+                    // Fast resume: continue immediately, no UI refresh, no log
+                    continueExec();
+                    return;
+                }
+            }
+
             emit outputReceived(QString("Stopped at 0x%1 (%2)")
                 .arg(pc, 0, 16).arg(reasonStr));
 
@@ -1708,13 +1719,6 @@ void DebugCore::onProcessStopped()
             } else {
                 emitAllRefresh();
                 if (reason == lldb::eStopReasonBreakpoint) {
-                    // Handle logging and fast-resume before UI update
-                    bool shouldResume = handleBreakpointLog(pc);
-                    if (shouldResume) {
-                        // Fast resume: continue without stopping in UI
-                        continueExec();
-                        return;
-                    }
                     emit breakpointHit(pc);
                 }
             }
