@@ -37,7 +37,7 @@ ScriptView::ScriptView(DebugCore* debugCore, QWidget* parent)
 
     m_editorBtn = new QPushButton("Editor...", this);
     m_editorBtn->setToolTip("Open multi-line script editor");
-    m_editorBtn->setFixedWidth(70);
+    m_editorBtn->setFixedWidth(90);
 
     inputLayout->addWidget(promptLabel);
     inputLayout->addWidget(m_input, 1);
