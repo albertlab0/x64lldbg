@@ -53,9 +53,13 @@ void CPUSideBar::collectJumps(QVector<JumpLine>& jumps)
         jmp.isAtIP = (line.address == pc);
 
         // Evaluate taken/not-taken for jump at RIP or selected jump
-        if ((jmp.isAtIP || jmp.isSelected) && jmp.isConditional)
+        if ((jmp.isAtIP || jmp.isSelected) && jmp.isConditional) {
             jmp.isTaken = evaluateJumpTaken(line.mnemonic, rflags);
-        else if ((jmp.isAtIP || jmp.isSelected) && !jmp.isConditional)
+            qDebug("[SideBar] Jump '%s' at 0x%llx: isAtIP=%d isSelected=%d rflags=0x%llx isTaken=%d",
+                   qPrintable(line.mnemonic), line.address,
+                   jmp.isAtIP, jmp.isSelected,
+                   rflags, jmp.isTaken);
+        } else if ((jmp.isAtIP || jmp.isSelected) && !jmp.isConditional)
             jmp.isTaken = true;  // unconditional jump is always taken
 
         uint64_t target = line.branchTarget;
