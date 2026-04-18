@@ -532,6 +532,29 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     int viewHeight = viewport()->height();
     int hScroll = horizontalScrollBar()->value();
 
+    // If a flow line was drawn last time but this paint won't draw one,
+    // we need a full repaint to clear the remnants.
+    // Check early, before any returns that skip flow line drawing.
+    bool willDrawFlowLine = false;
+    {
+        int selRow = currentRow();
+        if (selRow >= 0 && selRow < m_lines.size()) {
+            const auto& sel = m_lines[selRow];
+            if (sel.mnemonic.startsWith('j') && sel.branchTarget != 0)
+                willDrawFlowLine = true;
+        }
+    }
+    if (m_hadFlowLine && !willDrawFlowLine) {
+        m_hadFlowLine = false;
+        if (isPartialRepaint && !m_flowRepaintPending) {
+            m_flowRepaintPending = true;
+            QTimer::singleShot(0, this, [this]() {
+                m_flowRepaintPending = false;
+                viewport()->repaint();
+            });
+        }
+    }
+
     // Draw vertical separator lines between columns (x64dbg style)
     QColor sepColor = ConfigColor("TableGridColor");
     painter.setPen(QPen(sepColor, 1));
@@ -657,6 +680,8 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
         };
         painter.drawPolyline(pts, 3);
     }
+
+    m_hadFlowLine = true;
 
     // Flow line was drawn — if this was a partial repaint, the line is clipped.
     // Schedule one full repaint to fix it.

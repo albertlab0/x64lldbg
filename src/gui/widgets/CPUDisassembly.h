@@ -49,6 +49,7 @@ private:
     uint64_t m_baseAddress = 0;
     uint64_t m_gotoAddress = 0;  // user navigation highlight (Ctrl+G)
     bool m_flowRepaintPending = false;  // guards against repaint loops
+    bool m_hadFlowLine = false;         // flow line was drawn in last full paint
     QVector<DisassemblyLine> m_lines;
 
     // Column resize dragging (x64dbg-style, no visible header)
