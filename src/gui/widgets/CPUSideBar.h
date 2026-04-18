@@ -38,6 +38,8 @@ private:
     void collectJumps(QVector<JumpLine>& jumps);
     void allocateLanes(QVector<JumpLine>& jumps);
     void drawJump(QPainter& painter, const JumpLine& jmp, int headerHeight, int arrowRightX);
+
+public:
     static bool evaluateJumpTaken(const QString& mnemonic, uint64_t rflags);
 
     DebugCore* m_debugCore;

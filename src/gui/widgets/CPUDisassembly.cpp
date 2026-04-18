@@ -12,6 +12,7 @@
 #include <QMouseEvent>
 #include <QInputDialog>
 #include "gui/dialogs/EditBreakpointDialog.h"
+#include "gui/widgets/CPUSideBar.h"
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
     : QTableWidget(parent)
@@ -546,10 +547,10 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
     QColor arrowColor = ConfigColor("DisassemblyJumpArrowColor");
     int rowHeight = verticalHeader()->defaultSectionSize();
 
-    // X positions within the Bytes column
+    // X positions at the left edge of the Bytes column (before opcode text)
     int bytesColLeft = columnWidth(0) - hScroll;
-    int smallArrowX = bytesColLeft + 4;   // small triangle indicators
-    int lineX       = bytesColLeft + 12;  // full flow line for selected jump
+    int smallArrowX = bytesColLeft + 3;   // small triangle indicators
+    int lineX       = bytesColLeft - 3;   // full flow line, left of opcode bytes
 
     // ── 1. Small triangle indicators for ALL jump instructions ──
     for (int i = 0; i < m_lines.size(); i++) {
@@ -621,8 +622,17 @@ void CPUDisassembly::paintEvent(QPaintEvent* event)
         destOnScreen = false;
     }
 
-    // Red color for selected jump flow line
-    QColor flowColor = ConfigColor("SideBarJumpSelectedColor");
+    // Evaluate taken/not-taken for conditional jumps
+    bool isConditional = (selLine.mnemonic != "jmp" && selLine.mnemonic != "jmpq");
+    QColor flowColor;
+    if (isConditional) {
+        uint64_t rflags = m_debugCore->currentRFLAGS();
+        bool taken = CPUSideBar::evaluateJumpTaken(selLine.mnemonic, rflags);
+        flowColor = taken ? ConfigColor("SideBarJumpSelectedColor")
+                          : ConfigColor("SideBarJumpNotTakenColor");
+    } else {
+        flowColor = ConfigColor("SideBarJumpSelectedColor");
+    }
     QPen flowPen(flowColor, 1.5);
     painter.setPen(flowPen);
     painter.setBrush(Qt::NoBrush);
