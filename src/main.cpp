@@ -1,5 +1,7 @@
 #include <QApplication>
+#include <QCommandLineParser>
 #include <QFileInfo>
+#include <QTimer>
 #include <cstdlib>
 
 #include "common/Configuration.h"
@@ -55,6 +57,30 @@ int main(int argc, char* argv[])
     // Create and show main window
     MainWindow mainWindow(&debugCore);
     mainWindow.show();
+
+    // Optional positional arg: path to executable to debug, followed by
+    // args forwarded to the debuggee.
+    //   x64lldbg [<program> [<arg>...]]
+    QCommandLineParser parser;
+    parser.addPositionalArgument("program",
+        "Executable to debug (supports ~ and $VAR expansion)");
+    parser.addPositionalArgument("args", "Arguments to pass to the program",
+        "[args...]");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.process(app);
+
+    const QStringList positional = parser.positionalArguments();
+    if (!positional.isEmpty()) {
+        QString programPath = expandPath(positional.first());
+        QStringList programArgs = positional.mid(1);
+
+        QTimer::singleShot(0, &debugCore, [&debugCore, programPath, programArgs]() {
+            QStringList archs = DebugCore::detectArchitectures(programPath);
+            QString arch = (archs.size() == 1) ? archs.first() : QString();
+            debugCore.startDebug(programPath, programArgs, arch);
+        });
+    }
 
     return app.exec();
 }
