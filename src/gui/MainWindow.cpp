@@ -278,6 +278,17 @@ void MainWindow::createStatusBar()
 {
     m_statusLabel = new QLabel("Initialized");
     statusBar()->addWidget(m_statusLabel);
+
+    // Last-log segment: shows the most recent event (breakpoint hit,
+    // savedata completion, stop reason, etc.). Mirrors x64dbg's
+    // LogStatusLabel. Stretches to fill available space.
+    m_lastLogLabel = new QLabel(this);
+    m_lastLogLabel->setTextFormat(Qt::PlainText);
+    m_lastLogLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_lastLogLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_lastLogLabel->setStyleSheet(
+        "QLabel { color: palette(window-text); padding: 0 8px; }");
+    statusBar()->addWidget(m_lastLogLabel, 1);
 }
 
 void MainWindow::connectSignals()
@@ -289,6 +300,20 @@ void MainWindow::connectSignals()
     // Debug output → log
     connect(m_debugCore, &DebugCore::outputReceived,
             m_logView, &LogView::addMessage);
+
+    // Debug output → status bar last-log segment
+    auto updateLastLog = [this](const QString& msg) {
+        // Keep only the last non-empty line; status bar is one line tall.
+        QString line;
+        const auto parts = msg.split('\n', Qt::SkipEmptyParts);
+        for (auto it = parts.crbegin(); it != parts.crend(); ++it) {
+            if (!it->trimmed().isEmpty()) { line = it->trimmed(); break; }
+        }
+        if (!line.isEmpty())
+            m_lastLogLabel->setText(line);
+    };
+    connect(m_debugCore, &DebugCore::outputReceived, this, updateLastLog);
+    connect(m_commandLine, &CommandLineEdit::commandOutput, this, updateLastLog);
 
     // Register/memory changes → refresh all CPU widgets
     connect(m_debugCore, &DebugCore::registersChanged,

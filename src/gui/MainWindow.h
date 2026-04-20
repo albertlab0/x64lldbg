@@ -54,6 +54,7 @@ private:
 
     // Status bar
     QLabel* m_statusLabel;
+    QLabel* m_lastLogLabel;
 
     // Actions
     QAction* m_actionRun;
