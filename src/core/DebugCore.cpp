@@ -596,22 +596,62 @@ bool DebugCore::addBreakpoint(uint64_t address)
 
 bool DebugCore::addHardwareBreakpoint(uint64_t address)
 {
-    // LLDB doesn't directly expose hardware breakpoints through SB API
-    // but we can request it through breakpoint options
 #ifdef HAS_LLDB
     if (!m_target.IsValid()) return false;
-    lldb::SBBreakpoint bp = m_target.BreakpointCreateByAddress(address);
-    if (bp.IsValid()) {
-        // Note: LLDB manages hardware vs software breakpoints internally
-        // based on the target platform and breakpoint location
-        emit outputReceived(QString("Hardware breakpoint %1 set at 0x%2")
-            .arg(bp.GetID()).arg(address, 0, 16));
-        emit breakpointsChanged();
-        return true;
+
+    // LLDB 18's SB API does not expose SetIsHardware(). Use the command
+    // interpreter's `breakpoint set -H --address 0x...` which sets a
+    // hardware execute breakpoint via DR registers (platform permitting).
+    uint32_t beforeCount = m_target.GetNumBreakpoints();
+    QString cmd = QString("breakpoint set -H --address 0x%1").arg(address, 0, 16);
+    QString out, err;
+    bool ok = executeCommand(cmd, out, err);
+    uint32_t afterCount = m_target.GetNumBreakpoints();
+    if (!ok || afterCount <= beforeCount) {
+        emit outputReceived(QString("Hardware breakpoint at 0x%1 failed: %2")
+            .arg(address, 0, 16)
+            .arg(err.isEmpty() ? out.trimmed() : err.trimmed()));
+        return false;
     }
-    return false;
+
+    lldb::SBBreakpoint bp = m_target.GetBreakpointAtIndex(afterCount - 1);
+    emit outputReceived(QString("Hardware breakpoint %1 set at 0x%2")
+        .arg(bp.GetID()).arg(address, 0, 16));
+    emit breakpointsChanged();
+    return true;
 #else
     Q_UNUSED(address)
+    return true;
+#endif
+}
+
+bool DebugCore::addWatchpoint(uint64_t address, uint32_t size, bool readWrite)
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return false;
+    if (size != 1 && size != 2 && size != 4 && size != 8) {
+        emit outputReceived(QString("Watchpoint size must be 1, 2, 4, or 8 (got %1)").arg(size));
+        return false;
+    }
+
+    lldb::SBError err;
+    lldb::SBWatchpoint wp = m_target.WatchAddress(address, size,
+        /*read=*/readWrite, /*modify=*/true, err);
+    if (err.Fail() || !wp.IsValid()) {
+        emit outputReceived(QString("Watchpoint at 0x%1 failed: %2")
+            .arg(address, 0, 16).arg(err.GetCString() ? err.GetCString() : "unknown"));
+        return false;
+    }
+
+    emit outputReceived(QString("Watchpoint %1 set at 0x%2 (%3, %4 bytes)")
+        .arg(wp.GetID())
+        .arg(address, 0, 16)
+        .arg(readWrite ? "R/W" : "Write")
+        .arg(size));
+    emit breakpointsChanged();
+    return true;
+#else
+    Q_UNUSED(address) Q_UNUSED(size) Q_UNUSED(readWrite)
     return true;
 #endif
 }
@@ -677,6 +717,47 @@ bool DebugCore::removeBreakpointById(uint32_t id)
 #endif
 }
 
+bool DebugCore::removeBreakpoint(const BreakpointInfo& info)
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return false;
+    bool ok = false;
+    if (info.kind == BreakpointKind::WatchWrite ||
+        info.kind == BreakpointKind::WatchReadWrite) {
+        ok = m_target.DeleteWatchpoint(info.id);
+    } else {
+        ok = m_target.BreakpointDelete(info.id);
+    }
+    if (ok) emit breakpointsChanged();
+    return ok;
+#else
+    Q_UNUSED(info)
+    return true;
+#endif
+}
+
+bool DebugCore::toggleBreakpointEnabled(const BreakpointInfo& info)
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid()) return false;
+    if (info.kind == BreakpointKind::WatchWrite ||
+        info.kind == BreakpointKind::WatchReadWrite) {
+        lldb::SBWatchpoint wp = m_target.FindWatchpointByID(info.id);
+        if (!wp.IsValid()) return false;
+        wp.SetEnabled(!wp.IsEnabled());
+    } else {
+        lldb::SBBreakpoint bp = m_target.FindBreakpointByID(info.id);
+        if (!bp.IsValid()) return false;
+        bp.SetEnabled(!bp.IsEnabled());
+    }
+    emit breakpointsChanged();
+    return true;
+#else
+    Q_UNUSED(info)
+    return true;
+#endif
+}
+
 bool DebugCore::toggleBreakpoint(uint64_t address)
 {
 #ifdef HAS_LLDB
@@ -714,6 +795,8 @@ QVector<BreakpointInfo> DebugCore::getBreakpoints() const
         info.id = bp.GetID();
         info.enabled = bp.IsEnabled();
         info.isHardware = bp.IsHardware();
+        info.kind = info.isHardware ? BreakpointKind::HardwareExec
+                                    : BreakpointKind::Software;
         info.hitCount = bp.GetHitCount();
 
         const char* cond = bp.GetCondition();
@@ -751,6 +834,25 @@ QVector<BreakpointInfo> DebugCore::getBreakpoints() const
             info.dumpFilename = extra.dumpFilename;
         }
 
+        result.append(info);
+    }
+
+    // Append watchpoints (LLDB tracks these separately from breakpoints)
+    for (uint32_t i = 0; i < m_target.GetNumWatchpoints(); i++) {
+        lldb::SBWatchpoint wp = m_target.GetWatchpointAtIndex(i);
+        if (!wp.IsValid()) continue;
+
+        BreakpointInfo info;
+        info.id = wp.GetID();
+        info.address = wp.GetWatchAddress();
+        info.enabled = wp.IsEnabled();
+        info.isHardware = true;   // LLDB watchpoints use hardware
+        info.kind = wp.IsWatchingReads() ? BreakpointKind::WatchReadWrite
+                                         : BreakpointKind::WatchWrite;
+        info.watchSize = static_cast<uint32_t>(wp.GetWatchSize());
+        info.hitCount = wp.GetHitCount();
+        const char* cond = wp.GetCondition();
+        info.condition = cond ? QString(cond) : QString();
         result.append(info);
     }
 #endif
@@ -1773,7 +1875,8 @@ void DebugCore::onProcessStopped()
                 emitStepRefresh();
             } else {
                 emitAllRefresh();
-                if (reason == lldb::eStopReasonBreakpoint) {
+                if (reason == lldb::eStopReasonBreakpoint ||
+                    reason == lldb::eStopReasonWatchpoint) {
                     emit breakpointHit(pc);
                 }
             }

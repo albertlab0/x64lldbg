@@ -36,12 +36,21 @@ struct StackEntry {
     QString comment; // dereferenced string/symbol if pointer
 };
 
+enum class BreakpointKind {
+    Software,        // regular int3 code breakpoint
+    HardwareExec,    // hardware execute breakpoint (DR register)
+    WatchWrite,      // hardware watchpoint on write
+    WatchReadWrite   // hardware watchpoint on read or write
+};
+
 struct BreakpointInfo {
-    uint32_t id;
+    uint32_t id;             // LLDB breakpoint or watchpoint id (ids are not unique across the two)
     uint64_t address;
     QString module;
     bool enabled;
-    bool isHardware;
+    bool isHardware;         // true for HardwareExec and both Watch* kinds
+    BreakpointKind kind = BreakpointKind::Software;
+    uint32_t watchSize = 0;  // 1/2/4/8 — only meaningful for Watch* kinds
     QString condition;       // break condition (LLDB expression)
     uint32_t hitCount;
     QString logText;         // log message with {register} placeholders
@@ -138,10 +147,13 @@ public:
     // --- Breakpoints ---
     bool addBreakpoint(uint64_t address);
     bool addHardwareBreakpoint(uint64_t address);
+    bool addWatchpoint(uint64_t address, uint32_t size, bool readWrite);
     bool addConditionalBreakpoint(uint64_t address, const QString& condition);
     bool removeBreakpoint(uint64_t address);
     bool removeBreakpointById(uint32_t id);
+    bool removeBreakpoint(const BreakpointInfo& info);
     bool toggleBreakpoint(uint64_t address);
+    bool toggleBreakpointEnabled(const BreakpointInfo& info);
     QVector<BreakpointInfo> getBreakpoints() const;
 
     // --- Breakpoint properties (log, conditions) ---
