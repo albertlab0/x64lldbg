@@ -13,6 +13,7 @@
 #include <QInputDialog>
 #include <QTimer>
 #include "gui/dialogs/EditBreakpointDialog.h"
+#include "gui/dialogs/SetWatchpointDialog.h"
 #include "gui/widgets/CPUSideBar.h"
 
 CPUDisassembly::CPUDisassembly(DebugCore* debugCore, QWidget* parent)
@@ -137,6 +138,18 @@ void CPUDisassembly::setupContextMenu()
         editBP->setShortcut(Config()->getShortcut("EditBreakpoint").hotkey);
         connect(editBP, &QAction::triggered, this, [this]() {
             promptEditBreakpoint();
+        });
+
+        auto* hwBpMenu = menu.addMenu("Hardware Breakpoint");
+        auto* hwExec = hwBpMenu->addAction("Set Execute");
+        connect(hwExec, &QAction::triggered, this, [this]() {
+            uint64_t addr = selectedAddress();
+            if (addr != 0)
+                m_debugCore->addHardwareBreakpoint(addr);
+        });
+        auto* hwWatch = hwBpMenu->addAction("Set Watchpoint...");
+        connect(hwWatch, &QAction::triggered, this, [this]() {
+            promptSetWatchpoint();
         });
 
         // Label
@@ -298,9 +311,13 @@ void CPUDisassembly::rebuildTable()
 
     // Get breakpoint addresses for highlighting
     QSet<uint64_t> bpAddresses;
+    QSet<uint64_t> hwBpAddresses;
     auto bps = m_debugCore->getBreakpoints();
     for (const auto& bp : bps) {
-        if (bp.enabled)
+        if (!bp.enabled) continue;
+        if (bp.kind == BreakpointKind::HardwareExec)
+            hwBpAddresses.insert(bp.address);
+        else if (bp.kind == BreakpointKind::Software)
             bpAddresses.insert(bp.address);
     }
 
@@ -372,6 +389,7 @@ void CPUDisassembly::rebuildTable()
         // Highlight current IP, breakpoints, goto target
         bool isIP = (line.address == pc);
         bool isBP = bpAddresses.contains(line.address);
+        bool isHwBP = hwBpAddresses.contains(line.address);
         bool isGoto = (line.address == m_gotoAddress && m_gotoAddress != 0);
 
         if (isIP) {
@@ -383,11 +401,11 @@ void CPUDisassembly::rebuildTable()
                     it->setForeground(cipText);
                 }
             }
-        } else if (isBP) {
-            // x64dbg style: only the address column is highlighted red
+        } else if (isBP || isHwBP) {
+            // Address column highlighted: red for software, orange for hardware
             if (auto* it = item(i, 0)) {
-                it->setBackground(bpBg);
-                it->setForeground(ConfigColor("CurrentIPColor")); // white text on red
+                it->setBackground(isHwBP ? ConfigColor("HardwareBreakpointColor") : bpBg);
+                it->setForeground(ConfigColor("CurrentIPColor")); // white text
             }
         } else if (isGoto) {
             // User navigation highlight (Ctrl+G)
@@ -430,13 +448,18 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
     QColor defaultBg = ConfigColor("DisassemblyBackgroundColor");
 
     QSet<uint64_t> bpAddresses;
+    QSet<uint64_t> hwBpAddresses;
     auto bps = m_debugCore->getBreakpoints();
     for (const auto& bp : bps) {
-        if (bp.enabled)
+        if (!bp.enabled) continue;
+        if (bp.kind == BreakpointKind::HardwareExec)
+            hwBpAddresses.insert(bp.address);
+        else if (bp.kind == BreakpointKind::Software)
             bpAddresses.insert(bp.address);
     }
 
     QColor cipText = ConfigColor("CurrentIPColor");
+    QColor hwBpColor = ConfigColor("HardwareBreakpointColor");
     QColor addrColor = ConfigColor("DisassemblyAddressColor");
     QColor bytesColor = ConfigColor("DisassemblyBytesColor");
     QColor operColor = ConfigColor("DisassemblyTextColor");
@@ -445,6 +468,7 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
     for (int i = 0; i < m_lines.size(); i++) {
         bool isIP = (m_lines[i].address == pc);
         bool isBP = bpAddresses.contains(m_lines[i].address);
+        bool isHwBP = hwBpAddresses.contains(m_lines[i].address);
         const auto& line = m_lines[i];
 
         if (isIP) {
@@ -454,8 +478,8 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
                     it->setForeground(cipText);
                 }
             }
-        } else if (isBP) {
-            // x64dbg style: address column red, disasm columns keep instruction bg
+        } else if (isBP || isHwBP) {
+            // Address column highlighted: red for software, orange for hardware
             QColor mnBg = bgColorForMnemonic(line.mnemonic);
             QColor operBg = mnBg.isValid() ? ConfigColor("DisassemblyConditionalJumpBgColor") : QColor();
             bool isBranch = line.mnemonic.startsWith('j') ||
@@ -465,8 +489,8 @@ void CPUDisassembly::updateHighlights(uint64_t pc)
             for (int col = 0; col < 5; col++) {
                 if (auto* it = item(i, col)) {
                     if (col == 0) {
-                        it->setBackground(bpBg);
-                        it->setForeground(cipText); // white on red
+                        it->setBackground(isHwBP ? hwBpColor : bpBg);
+                        it->setForeground(cipText); // white text
                     } else {
                         QColor bg = defaultBg;
                         if (col == 2 && mnBg.isValid()) bg = mnBg;
@@ -898,6 +922,16 @@ void CPUDisassembly::promptSetLabel()
 
     if (ok)
         m_debugCore->setLabel(addr, label.trimmed());
+}
+
+void CPUDisassembly::promptSetWatchpoint()
+{
+    uint64_t addr = selectedAddress();
+    if (addr == 0) return;
+
+    SetWatchpointDialog dlg(addr, this);
+    if (dlg.exec() == QDialog::Accepted)
+        m_debugCore->addWatchpoint(dlg.address(), dlg.size(), dlg.readWrite());
 }
 
 void CPUDisassembly::promptEditBreakpoint()

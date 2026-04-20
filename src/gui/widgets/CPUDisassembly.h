@@ -41,6 +41,7 @@ private:
     void updateHighlights(uint64_t pc);
     void promptSetLabel();
     void promptEditBreakpoint();
+    void promptSetWatchpoint();
     QColor colorForMnemonic(const QString& mnemonic) const;
     QColor bgColorForMnemonic(const QString& mnemonic) const;
     int columnBoundaryAt(int x) const;  // returns col index if x is near a boundary, else -1

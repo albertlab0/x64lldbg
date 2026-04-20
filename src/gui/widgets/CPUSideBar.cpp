@@ -249,6 +249,7 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
     QColor bg = ConfigColor("SideBarBackgroundColor");
     QColor bulletColor = ConfigColor("SideBarBulletColor");
     QColor bpColor = ConfigColor("BreakpointColor");
+    QColor hwBpColor = ConfigColor("HardwareBreakpointColor");
 
     // x64dbg CIP label colors: blue background (#4040FF), white text
     QColor cipLabelBg = QColor("#4040FF");
@@ -261,11 +262,15 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
 
     uint64_t pc = m_cachedPC;
 
-    // Get breakpoint addresses
+    // Get breakpoint addresses (track software vs hardware separately)
     QSet<uint64_t> bpAddresses;
+    QSet<uint64_t> hwBpAddresses;
     auto bps = m_debugCore->getBreakpoints();
     for (const auto& bp : bps) {
-        if (bp.enabled)
+        if (!bp.enabled) continue;
+        if (bp.kind == BreakpointKind::HardwareExec)
+            hwBpAddresses.insert(bp.address);
+        else if (bp.kind == BreakpointKind::Software)
             bpAddresses.insert(bp.address);
     }
 
@@ -314,11 +319,12 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
         uint64_t addr = m_lines[i].address;
         bool isIP = (addr == pc);
         bool isBP = bpAddresses.contains(addr);
+        bool isHwBP = hwBpAddresses.contains(addr);
 
-        if (isBP) {
-            // Breakpoint: red filled circle
+        if (isBP || isHwBP) {
+            // Red for software, orange for hardware
             painter.setPen(Qt::NoPen);
-            painter.setBrush(bpColor);
+            painter.setBrush(isHwBP ? hwBpColor : bpColor);
             painter.drawEllipse(QPoint(bulletCenterX, y), 6, 6);
         }
 
@@ -357,7 +363,7 @@ void CPUSideBar::paintEvent(QPaintEvent* event)
             painter.drawLine(arrowEndX - 1, arrowY,     arrowEndX - arrowSize, arrowY + arrowSize - 1);
 
             painter.restore();
-        } else if (!isBP) {
+        } else if (!isBP && !isHwBP) {
             // Regular bullet (only if not BP and not IP)
             painter.setPen(Qt::NoPen);
             painter.setBrush(bulletColor);

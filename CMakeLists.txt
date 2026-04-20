@@ -107,6 +107,8 @@ set(SOURCES
     src/gui/dialogs/EditBreakpointDialog.cpp
     src/gui/dialogs/ScriptEditorDialog.h
     src/gui/dialogs/ScriptEditorDialog.cpp
+    src/gui/dialogs/SetWatchpointDialog.h
+    src/gui/dialogs/SetWatchpointDialog.cpp
 )
 
 # --- Resources ---
