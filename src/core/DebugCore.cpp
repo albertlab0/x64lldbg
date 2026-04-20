@@ -1835,24 +1835,6 @@ void DebugCore::onProcessStopped()
         lldb::SBThread thread = m_process.GetSelectedThread();
         if (thread.IsValid()) {
             lldb::StopReason reason = thread.GetStopReason();
-            QString reasonStr;
-            switch (reason) {
-            case lldb::eStopReasonBreakpoint:
-                reasonStr = "breakpoint";
-                break;
-            case lldb::eStopReasonWatchpoint:
-                reasonStr = "watchpoint";
-                break;
-            case lldb::eStopReasonSignal:
-                reasonStr = QString("signal %1").arg(thread.GetStopReasonDataAtIndex(0));
-                break;
-            case lldb::eStopReasonPlanComplete:
-                reasonStr = "step complete";
-                break;
-            default:
-                reasonStr = "unknown";
-                break;
-            }
 
             lldb::SBFrame frame = thread.GetSelectedFrame();
             uint64_t pc = frame.IsValid() ? frame.GetPC() : 0;
@@ -1867,8 +1849,42 @@ void DebugCore::onProcessStopped()
                 }
             }
 
-            emit outputReceived(QString("Stopped at 0x%1 (%2)")
-                .arg(pc, 0, 16).arg(reasonStr));
+            // Build an x64dbg-style stop message that distinguishes
+            // software / hardware-execute / watchpoint.
+            QString msg;
+            if (reason == lldb::eStopReasonBreakpoint) {
+                uint32_t bpId = static_cast<uint32_t>(
+                    thread.GetStopReasonDataAtIndex(0));
+                lldb::SBBreakpoint bp = m_target.FindBreakpointByID(bpId);
+                bool isHw = bp.IsValid() && bp.IsHardware();
+                msg = isHw
+                    ? QString("Hardware breakpoint (execute) at 0x%1!")
+                          .arg(pc, 0, 16)
+                    : QString("INT3 breakpoint at 0x%1!").arg(pc, 0, 16);
+            } else if (reason == lldb::eStopReasonWatchpoint) {
+                uint32_t wpId = static_cast<uint32_t>(
+                    thread.GetStopReasonDataAtIndex(0));
+                lldb::SBWatchpoint wp = m_target.FindWatchpointByID(wpId);
+                QString access = "write";
+                uint64_t wpAddr = pc;
+                if (wp.IsValid()) {
+                    access = wp.IsWatchingReads() ? "read/write" : "write";
+                    wpAddr = wp.GetWatchAddress();
+                }
+                msg = QString("Memory breakpoint (%1) at 0x%2, exception address: 0x%3!")
+                          .arg(access)
+                          .arg(wpAddr, 0, 16)
+                          .arg(pc, 0, 16);
+            } else if (reason == lldb::eStopReasonSignal) {
+                msg = QString("Stopped at 0x%1 (signal %2)")
+                          .arg(pc, 0, 16)
+                          .arg(thread.GetStopReasonDataAtIndex(0));
+            } else if (reason == lldb::eStopReasonPlanComplete) {
+                msg = QString("Stopped at 0x%1 (step complete)").arg(pc, 0, 16);
+            } else {
+                msg = QString("Stopped at 0x%1").arg(pc, 0, 16);
+            }
+            emit outputReceived(msg);
 
             if (reason == lldb::eStopReasonPlanComplete) {
                 // Step completed — only registers and memory change

@@ -13,6 +13,8 @@
 #include <QMessageBox>
 #include <QIcon>
 #include <QStyle>
+#include <QWidget>
+#include <QVBoxLayout>
 
 #include "core/DebugCore.h"
 #include "common/Configuration.h"
@@ -257,21 +259,30 @@ void MainWindow::createCentralTabs()
     // CPU tab selected by default
     m_tabWidget->setCurrentIndex(0);
 
-    setCentralWidget(m_tabWidget);
-}
-
-void MainWindow::createCommandBar()
-{
+    // Central widget wraps tabs + command line stacked vertically so the
+    // command line sits on its own row above the status bar (x64dbg layout).
     m_commandLine = new CommandLineEdit(m_debugCore, this);
     m_commandLine->setDumpWidget(m_cpuWidget->getDump());
     m_commandLine->setLogView(m_logView);
 
-    // Route command output to the log view
+    auto* container = new QWidget(this);
+    auto* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(m_tabWidget, 1);
+    layout->addWidget(m_commandLine);
+
+    setCentralWidget(container);
+}
+
+void MainWindow::createCommandBar()
+{
+    // Route command output to the log view. The command line widget itself
+    // is created in createCentralTabs() so it can share a layout with the
+    // tabs (matches x64dbg's vertical stacking of command line over status
+    // bar).
     connect(m_commandLine, &CommandLineEdit::commandOutput,
             m_logView, &LogView::addMessage);
-
-    // Add to status bar area (bottom of window)
-    statusBar()->addPermanentWidget(m_commandLine, 1);
 }
 
 void MainWindow::createStatusBar()
