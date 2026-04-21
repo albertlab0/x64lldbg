@@ -89,6 +89,8 @@ void Configuration::loadX64dbgDefaultColors()
     m_colors["StackTextColor"]                     = QColor("#000000");
     m_colors["StackAddressColor"]                  = QColor("#808080");
     m_colors["StackCurrentSPColor"]                = QColor("#000000");
+    m_colors["StackFrameColor"]                    = QColor("#000000");
+    m_colors["StackFrameSystemColor"]              = QColor("#0000FF");
 
     m_colors["HexDumpBackgroundColor"]             = QColor("#FFF8F0");
     m_colors["HexDumpTextColor"]                   = QColor("#000000");
@@ -172,6 +174,8 @@ void Configuration::loadModernLightColors()
     m_colors["StackTextColor"]                     = QColor("#1A1A2E");
     m_colors["StackAddressColor"]                  = QColor("#8B8B9A");
     m_colors["StackCurrentSPColor"]                = QColor("#1D6FB5");
+    m_colors["StackFrameColor"]                    = QColor("#1A1A2E");
+    m_colors["StackFrameSystemColor"]              = QColor("#1D6FB5");
 
     m_colors["HexDumpBackgroundColor"]             = QColor("#FBFBFB");
     m_colors["HexDumpTextColor"]                   = QColor("#1A1A2E");
@@ -258,6 +262,8 @@ void Configuration::loadCutterDarkColors()
     m_colors["StackTextColor"]                     = QColor("#eff0f1");
     m_colors["StackAddressColor"]                  = QColor("#6c7680");
     m_colors["StackCurrentSPColor"]                = QColor("#42eef4");
+    m_colors["StackFrameColor"]                    = QColor("#eff0f1");
+    m_colors["StackFrameSystemColor"]              = QColor("#42eef4");
 
     // Hex dump
     m_colors["HexDumpBackgroundColor"]             = QColor("#25282b");

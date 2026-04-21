@@ -1204,6 +1204,7 @@ QVector<CallStackEntry> DebugCore::getCallStack()
         CallStackEntry entry;
         entry.index = i;
         entry.address = frame.GetPC();
+        entry.cfa = frame.GetCFA();
 
         // Return address from caller frame
         if (i + 1 < numFrames) {
@@ -1225,8 +1226,8 @@ QVector<CallStackEntry> DebugCore::getCallStack()
         cs.append(entry);
     }
 #else
-    cs.append({0, 0x00401000, 0x00401050, "x64lldbg", "main"});
-    cs.append({1, 0x00401050, 0x7FFF20010000, "x64lldbg", "_start"});
+    cs.append({0, 0x00401000, 0x00401050, 0, "x64lldbg", "main"});
+    cs.append({1, 0x00401050, 0x7FFF20010000, 0, "x64lldbg", "_start"});
 #endif
     return cs;
 }

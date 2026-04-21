@@ -78,8 +78,9 @@ struct ThreadInfo {
 
 struct CallStackEntry {
     uint32_t index;
-    uint64_t address;
+    uint64_t address;          // frame PC
     uint64_t returnAddress;
+    uint64_t cfa;              // canonical frame address (stack base for this frame)
     QString module;
     QString function;
 };
