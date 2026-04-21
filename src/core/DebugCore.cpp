@@ -1359,6 +1359,18 @@ QString DebugCore::dereferencePointer(uint64_t address)
 {
     if (address == 0) return QString();
 
+    // Return-address heuristic (x64dbg style): is `address` preceded
+    // by a call instruction? If so, annotate with the call target.
+    if (uint64_t callPC = isReturnAddress(address)) {
+        QString target = getSymbolAt(address);
+        QString from   = getSymbolAt(callPC);
+        if (!target.isEmpty() && !from.isEmpty())
+            return QString("return to %1 from %2").arg(target, from);
+        if (!target.isEmpty())
+            return QString("return to %1").arg(target);
+        return QString("return to 0x%1").arg(address, 0, 16);
+    }
+
     // Try string first
     QString str = getStringAt(address);
     if (!str.isEmpty())
@@ -1370,6 +1382,40 @@ QString DebugCore::dereferencePointer(uint64_t address)
         return "<" + sym + ">";
 
     return QString();
+}
+
+uint64_t DebugCore::isReturnAddress(uint64_t address)
+{
+#ifdef HAS_LLDB
+    if (!m_target.IsValid() || !m_process.IsValid() || address == 0)
+        return 0;
+
+    // The return address is the instruction *after* the call. An x86 call
+    // is 2–7 bytes. Try progressively larger windows before `address` and
+    // disassemble one instruction at each candidate start; accept the
+    // first window whose single instruction ends exactly at `address`
+    // and is a call.
+    const int maxCallSize = 7;
+    for (int len = 2; len <= maxCallSize; ++len) {
+        uint64_t candidate = address - len;
+        lldb::SBAddress sbAddr(candidate, m_target);
+        const char* flavor = (m_asmFlavor == Intel) ? "intel" : "att";
+        lldb::SBInstructionList insts =
+            m_target.ReadInstructions(sbAddr, 1, flavor);
+        if (insts.GetSize() == 0) continue;
+        lldb::SBInstruction inst = insts.GetInstructionAtIndex(0);
+        if (!inst.IsValid()) continue;
+        if (static_cast<int>(inst.GetByteSize()) != len) continue;
+        const char* mnemonic = inst.GetMnemonic(m_target);
+        if (!mnemonic) continue;
+        QString m = QString(mnemonic).trimmed();
+        if (m == "call" || m == "callq")
+            return candidate;
+    }
+#else
+    Q_UNUSED(address)
+#endif
+    return 0;
 }
 
 QString DebugCore::getStringAt(uint64_t address, int maxLen)

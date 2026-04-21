@@ -144,32 +144,22 @@ void CPUStack::refresh()
     for (int i = 0; i < entries.size(); i++) {
         const auto& entry = entries[i];
 
+        // x64dbg marks the SP row with a coloured address only — no
+        // full-row background highlight.
         auto* addrItem = new QTableWidgetItem(
             QString("0x%1").arg(entry.address, 16, 16, QChar('0'))
         );
-        addrItem->setForeground(addrColor);
-        if (i == 0) {
-            addrItem->setBackground(spColor);
-            addrItem->setForeground(QColor(0xFF, 0xFF, 0xFF));  // white on black
-        }
+        addrItem->setForeground(i == 0 ? spColor : addrColor);
         setItem(i, 0, addrItem);
 
         auto* valueItem = new QTableWidgetItem(
             QString("0x%1").arg(entry.value, 16, 16, QChar('0'))
         );
         valueItem->setForeground(valueColor);
-        if (i == 0) {
-            valueItem->setBackground(spColor);
-            valueItem->setForeground(QColor(0xFF, 0xFF, 0xFF));
-        }
         setItem(i, 1, valueItem);
 
         auto* commentItem = new QTableWidgetItem(entry.comment);
         commentItem->setForeground(commentColor);
-        if (i == 0) {
-            commentItem->setBackground(spColor);
-            commentItem->setForeground(QColor(0xFF, 0xFF, 0xFF));
-        }
         setItem(i, 2, commentItem);
     }
 }

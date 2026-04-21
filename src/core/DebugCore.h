@@ -185,6 +185,9 @@ public:
     QString dereferencePointer(uint64_t address);
     QString getStringAt(uint64_t address, int maxLen = 256);
     QString getSymbolAt(uint64_t address);
+    // If `address` is preceded by a `call` instruction in executable memory,
+    // returns the caller's PC (instruction address of the call); 0 otherwise.
+    uint64_t isReturnAddress(uint64_t address);
 
     // --- Command execution (LLDB commands + Python via 'script') ---
     bool executeCommand(const QString& command, QString& output, QString& error);
