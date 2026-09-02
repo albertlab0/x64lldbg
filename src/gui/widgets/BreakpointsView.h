@@ -16,11 +16,15 @@ public slots:
 signals:
     void breakpointDoubleClicked(uint64_t address);
 
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
 private:
     void setupColumns();
     void applyStyle();
     void setupContextMenu();
     void editBreakpointAt(int row);
+    void deleteSelectedBreakpoints();
 
     DebugCore* m_debugCore;
 };

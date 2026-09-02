@@ -3,6 +3,7 @@
 #include "gui/dialogs/EditBreakpointDialog.h"
 
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QMenu>
 
 BreakpointsView::BreakpointsView(DebugCore* debugCore, QWidget* parent)
@@ -76,8 +77,8 @@ void BreakpointsView::setupContextMenu()
 
         auto* deleteAction = menu.addAction("Delete Breakpoint");
         deleteAction->setShortcut(Qt::Key_Delete);
-        connect(deleteAction, &QAction::triggered, this, [this, bp]() {
-            m_debugCore->removeBreakpoint(bp);
+        connect(deleteAction, &QAction::triggered, this, [this]() {
+            deleteSelectedBreakpoints();
         });
 
         auto* toggleAction = menu.addAction("Enable/Disable");
@@ -95,6 +96,36 @@ void BreakpointsView::setupContextMenu()
 
         menu.exec(viewport()->mapToGlobal(pos));
     });
+}
+
+void BreakpointsView::deleteSelectedBreakpoints()
+{
+    auto ranges = selectedRanges();
+    QList<int> rows;
+    for (const auto& range : ranges) {
+        for (int r = range.topRow(); r <= range.bottomRow(); r++)
+            rows.append(r);
+    }
+    if (rows.isEmpty()) return;
+
+    auto breakpoints = m_debugCore->getBreakpoints();
+    QList<BreakpointInfo> toRemove;
+    for (int row : rows) {
+        if (row >= 0 && row < breakpoints.size())
+            toRemove.append(breakpoints[row]);
+    }
+    for (const auto& bp : toRemove)
+        m_debugCore->removeBreakpoint(bp);
+}
+
+void BreakpointsView::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Delete && event->modifiers() == Qt::NoModifier) {
+        deleteSelectedBreakpoints();
+        event->accept();
+        return;
+    }
+    QTableWidget::keyPressEvent(event);
 }
 
 void BreakpointsView::editBreakpointAt(int row)
